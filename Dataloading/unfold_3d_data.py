@@ -66,6 +66,6 @@ def process_directory(input_dir, output_dir, label):
 
 
 
-process_directory("/work/scratch/geiger/Datasets/CTC/sim3d/01_test",
-                    "/work/scratch/geiger/Datasets/CTC/sim3d/01_test_2d",
+process_directory("../Datasets/CTC/sim3d/01_test",
+                    "../Datasets/CTC/sim3d/01_test_2d",
                      label=False)

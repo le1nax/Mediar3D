@@ -2,8 +2,8 @@
     "data_setups":{
         "labeled":{
             "root": "./",
-            "mapping_file": "/home/students/geiger/repos/MEDIAR/train_tools/data_utils/mapping_labeled_dic_sim.json",
-            "tuning_mapping_file": "/home/students/geiger/repos/MEDIAR/train_tools/data_utils/mapping_tuning_dic_sim.json",
+            "mapping_file": "./train_tools/data_utils/mapping_labeled_dic_sim.json",
+            "tuning_mapping_file": "./train_tools/data_utils/mapping_tuning_dic_sim.json",
             "amplified": false,
             "batch_size": 5, 
             "valid_portion": 0.1
@@ -26,7 +26,7 @@
             "params": {},
             "pretrained":{
                 "enabled": true,
-                "weights": "/work/scratch/geiger/W_B/MEDIAR_PT/from_phase1.pth",
+                "weights": "./W_B/MEDIAR_PT/from_phase1.pth",
                 "strict": false
             }
         },
@@ -52,8 +52,8 @@
         "seed": 19940817
     },
     "pred_setups":{
-        "input_path": "/work/scratch/geiger/Datasets/CTC/sim3d/01",
-        "output_path": "/work/scratch/geiger/Datasets/CTC/sim3d/01_train_res",
+        "input_path": "./Datasets/CTC/sim3d/01",
+        "output_path": "./Datasets/CTC/sim3d/01_train_res",
         "make_submission": false,
         "exp_name": "mediar_from_phase1",
         "algo_params": {"use_tta": false}

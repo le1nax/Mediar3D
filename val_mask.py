@@ -14,7 +14,7 @@ def count_nonzero_images_in_file(filepath):
 
 def main():
     total_nonzero_images = 0
-    dir = "/work/scratch/geiger/Datasets/CTC/sim3d/01_2d_cpsam"
+    dir = "../../../Datasets/CTC/sim3d/01_2d_cpsam"
     for filename in os.listdir(dir):
         if filename.endswith('_label.tiff'):
             filepath = os.path.join(dir, filename)
