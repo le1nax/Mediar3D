@@ -72,7 +72,7 @@ def _get_setups(args):
 
 def main(args):
     """Execute experiment."""
-
+    print(os.getcwd())
     # Initialize W&B
     wandb.init(config=args, **args.wandb_setups)
 
@@ -91,12 +91,25 @@ def main(args):
     # Conduct experiment
     trainer.train()
 
-    save_dir = "/work/scratch/geiger/W_B/MEDIAR_FT"
+    save_dir = "../W_B/MEDIAR_FT"
     os.makedirs(save_dir, exist_ok=True)  # make sure it exists
 
     # Save model
-    model_path = os.path.join(save_dir, "model.pth")
-    torch.save(trainer.model.state_dict(), model_path)
+    model_path = os.path.join(save_dir, "test_model.pth")
+    print(f"Saving model to: {model_path}")
+    try:
+        os.makedirs(save_dir, exist_ok=True)  # ensure directory exists
+        torch.save(trainer.model.state_dict(), model_path)
+        print(f"Model successfully saved to {model_path}")
+
+    except FileNotFoundError as e:
+        print(f"FileNotFoundError: {e}")
+
+    except PermissionError as e:
+        print(f"PermissionError: {e}")
+
+    except Exception as e:
+        print(f"Unexpected error while saving model: {e}")
 
     # # Conduct prediction using the trained model
     # predictor = PREDICTOR[args.train_setups.trainer.name](

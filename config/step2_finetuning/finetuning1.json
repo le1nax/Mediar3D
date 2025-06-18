@@ -5,7 +5,7 @@
             "mapping_file": "./train_tools/data_utils/mapping_labeled_dic_sim.json",
             "tuning_mapping_file": "./train_tools/data_utils/mapping_tuning_dic_sim.json",
             "amplified": false,
-            "batch_size": 5, 
+            "batch_size": 2, 
             "valid_portion": 0.1
         },
         "public":{
@@ -26,14 +26,14 @@
             "params": {},
             "pretrained":{
                 "enabled": true,
-                "weights": "./W_B/MEDIAR_PT/from_phase1.pth",
+                "weights": "../../W_B/MEDIAR_PT/from_phase1.pth",
                 "strict": false
             }
         },
         "trainer": {
             "name": "mediar",
             "params": {            
-                "num_epochs": 100,
+                "num_epochs": 1,
                 "valid_frequency": 5,
                 "device": "cuda:0",
                 "amp": false,
@@ -52,8 +52,8 @@
         "seed": 19940817
     },
     "pred_setups":{
-        "input_path": "./Datasets/CTC/sim3d/01",
-        "output_path": "./Datasets/CTC/sim3d/01_train_res",
+        "input_path": "../../Datasets/CTC/sim3d/01",
+        "output_path": "../../Datasets/CTC/sim3d/01_train_res",
         "make_submission": false,
         "exp_name": "mediar_from_phase1",
         "algo_params": {"use_tta": false}

@@ -55,6 +55,11 @@ def official_paths_tuning(image_path):
 def add_mapping_to_json(json_file, map_dict):
     """Save mapped dictionary as a json file"""
 
+    # Delete existing mapping file if it exists
+    if os.path.exists(json_file):
+        os.remove(json_file)
+        print(f'>>> Removed existing mapping file: {json_file}')
+
     if not os.path.exists(json_file):
         with open(json_file, "w") as file:
             json.dump({}, file)
@@ -75,9 +80,9 @@ def add_mapping_to_json(json_file, map_dict):
 if __name__ == "__main__":
     # [!Caution] The paths should be overrided for the local environment!
     parser = argparse.ArgumentParser(description="Mapping files and paths")
-    parser.add_argument("--pred_path", default="../Datasets/CTC/sim3d/01_2d", type=str)
-    parser.add_argument("--train_img_path", default="../Datasets/CTC/sim3d/01_2d", type=str)
-    parser.add_argument("--train_label_path", default="../Datasets/CTC/sim3d/01_GT_2d", type=str)
+    parser.add_argument("--pred_path", default="../../Datasets/CTC/sim3d/01_2d", type=str)
+    parser.add_argument("--train_img_path", default="../../Datasets/CTC/sim3d/01_2d", type=str)
+    parser.add_argument("--train_label_path", default="../../Datasets/CTC/sim3d/01_GT_2d", type=str)
     parser.add_argument("--data", default="dic_sim", type=str)
     args = parser.parse_args()
 

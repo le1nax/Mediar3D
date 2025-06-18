@@ -1,0 +1,8 @@
+{
+    "eval_setups":{
+        "img_path": "../../Datasets/CTC/sim3d/02_test",
+        "gt_path": "../../Datasets/CTC/sim3d/02_test_GT",
+        "pred_path": "../../Datasets/CTC/sim3d/02_test_res",
+        "save_path": "../../Datasets/CTC/sim3d/eval_res"
+    }
+}

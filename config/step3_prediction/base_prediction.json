@@ -4,7 +4,7 @@
         "input_path": "../../Datasets/CTC/sim3d/02_test",
         "output_path": "../../Datasets/CTC/sim3d/02_test_res",
         "make_submission": false,
-        "model_path": "../W_B/MEDIAR_PT/from_phase1.pth",
+        "model_path": "../../W_B/MEDIAR_PT/from_phase1.pth",
         "device": "cuda:0",
         "model":{
             "name": "mediar-former",
