@@ -255,8 +255,8 @@ class Predictor(BasePredictor):
 
             y_p = y[-1].permute(ipm[p])
             yf[-1] += y_p
-            pltval= self._sigmoid(yf[-1,30,:,:].cpu().squeeze())
-            self.plot_imageSlider(image=pltval)
+            #pltval= self._sigmoid(yf[-1,30,:,:].cpu().squeeze())
+            #self.plot_imageSlider(image=pltval)
             for j in range(2):
                 yf[cp[p][j]] += y[cpy[p][j]].permute(ipm[p])
             y = None; del y
@@ -330,7 +330,7 @@ class Predictor(BasePredictor):
             cellprob_threshold = 0.5
         os.makedirs(self.output_path, exist_ok=True)
 
-        self.plot_image(cellprob[30])
+        #self.plot_image(cellprob[30])
 
         if np.prod(H * W) < (5000 * 5000):
             pred_mask = compute_masks3D(
@@ -397,8 +397,8 @@ class Predictor(BasePredictor):
                     ] = pred_mask
 
             pred_mask = pred_pad[:H, :W]
-        if(cellcenters is not None):
-            pred_mask = filter_false_positives(pred_mask, cellcenters)
+        # if(cellcenters is not None):
+        #     pred_mask = filter_false_positives(pred_mask, cellcenters)
         return pred_mask
     
     

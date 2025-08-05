@@ -37,18 +37,76 @@ def z_project_cellcenters(cellcenters):
 
     return projected_volume
 
+def project_lower_to_upper(cellcenters, slice_index, axis=0):
+    """
+    Projects all cell centers from the lower part (below slice_index along given axis)
+    to the first slice of the upper part, to compensate for center loss due to cropping.
+
+    Args:
+        cellcenters (ndarray): 3D binary mask of shape (Z, H, W)
+        slice_index (int): Index at which the volume is split into lower and upper parts.
+        axis (int): Axis along which to perform the split (0=Z, 1=Y, 2=X)
+
+    Returns:
+        ndarray: Modified 3D binary mask for the upper half with projected centers.
+    """
+    if axis not in [0, 1, 2]:
+        raise ValueError("Axis must be 0 (Z), 1 (Y), or 2 (X)")
+
+    # Move axis to front for uniform processing
+    data = np.moveaxis(cellcenters, axis, 0)  # shape -> (D, other1, other2)
+
+    # Split and copy upper part
+    upper = np.copy(data[slice_index:])  # shape (D_upper, other1, other2)
+
+    # Projection from lower part
+    lower_projection = np.any(data[:slice_index] > 0, axis=0).astype(np.uint8)  # shape (other1, other2)
+
+    # Project onto the first slice of upper part
+    if upper.shape[0] > 0:
+        upper[0] = np.logical_or(upper[0], lower_projection).astype(np.uint8)
+
+    # Reconstruct full output in original axis order
+    result = np.zeros_like(data, dtype=np.uint8)
+    result[slice_index:] = upper
+    result = np.moveaxis(result, 0, axis)
+
+    return result
+
+def crop_along_axis(volume, slice_obj, axis=0):
+    """
+    Crops a 3D volume along a specified axis using a provided slice object.
+
+    Args:
+        volume (ndarray): 3D array (e.g., shape (Z, H, W))
+        slice_obj (slice): A Python slice object (e.g., slice(0, 64), slice(None, 32))
+        axis (int): Axis along which to apply the slice (0=Z, 1=Y, 2=X)
+
+    Returns:
+        ndarray: Cropped 3D volume
+    """
+    assert volume.ndim == 3, "Input must be a 3D array"
+    assert 0 <= axis <= 2, "Axis must be 0 (Z), 1 (Y), or 2 (X)"
+    assert isinstance(slice_obj, slice), "slice_obj must be a slice object"
+
+    # Create full slice for each axis
+    slicer = [slice(None)] * 3
+    slicer[axis] = slice_obj
+
+    return volume[tuple(slicer)]
 
 def main(args):
 
     slice_index = args.eval_setups.slice_index
+    axis = args.eval_setups.axis
 
     # Output directory to save slices
     output_img_dir = args.eval_setups.fs_train_img
     output_val_dir = args.eval_setups.fs_train_masks
     output_cellcenter_dir = args.eval_setups.fs_train_cellcenters
 
-    # os.makedirs(output_img_dir, exist_ok=True)
-    # os.makedirs(output_val_dir, exist_ok=True)
+    os.makedirs(output_img_dir, exist_ok=True)
+    os.makedirs(output_val_dir, exist_ok=True)
     os.makedirs(output_cellcenter_dir, exist_ok=True)
 
     # Output directory to save inference image
@@ -56,8 +114,8 @@ def main(args):
     output_inference_val_dir = args.eval_setups.fs_inference_masks
     output_inference_cellcenters_dir = args.eval_setups.fs_inference_cellcenters
 
-    # os.makedirs(output_img_dir, exist_ok=True)
-    # os.makedirs(output_val_dir, exist_ok=True)
+    os.makedirs(output_inference_img_dir, exist_ok=True)
+    os.makedirs(output_inference_val_dir, exist_ok=True)
     os.makedirs(output_inference_cellcenters_dir, exist_ok=True)
 
 
@@ -69,55 +127,124 @@ def main(args):
     cellcenter_names = sorted(os.listdir(cellcenters_path))
 
 
-    for i in tqdm(range(len(img_names))):
+    buffer = 10  # pixels to extend beyond bounding box
 
+    for i in tqdm(range(len(img_names))):
         # Load images
         gt = tif.imread(os.path.join(gt_path, gt_names[i]))
         img = tif.imread(os.path.join(img_path, img_names[i]))
         cellcenters = tif.imread(os.path.join(cellcenters_path, cellcenter_names[i]))
-        
 
-        ###slice 2d train images
-        img_crop = img[:slice_index]
-        gt_crop = gt[:slice_index]
-        cellcenters_proj = z_project_cellcenters(cellcenters)
-        cellcenters_proj_crop = cellcenters_proj[:slice_index]
-        
+        assert gt.shape == img.shape, f"Shape mismatch: {img.shape} vs {gt.shape}"
 
-        for i, slice_2d in enumerate(img_crop):
-            filename = f"cell_{i:05d}.tiff"  # zero-padded to 5 digits
-            filepath = os.path.join(output_img_dir, filename)
-            tif.imwrite(filepath, slice_2d)
-            print(f"Saved {len(img_crop)} slices to '{output_img_dir}' directory.")
+        # Find bounding box of the label
+        nonzero = np.argwhere(gt > 0)
+        if nonzero.size == 0:
+            print(f"Warning: No label found in {gt_names[i]}")
+            continue
 
-        for i, slice_2d in enumerate(gt_crop):
-            filename = f"cell_{i:05d}_label.tiff"  # zero-padded to 5 digits
-            filepath = os.path.join(output_val_dir, filename)
-            tif.imwrite(filepath, slice_2d)
-            print(f"Saved {len(gt_crop)} slices to '{output_val_dir}' directory.")
+        zmin, ymin, xmin = nonzero.min(axis=0)
+        zmax, ymax, xmax = nonzero.max(axis=0)
 
-        for i, slice_2d in enumerate(cellcenters_proj_crop):
-            filename = f"cell_centers_{i:05d}.tiff"  # zero-padded to 5 digits
-            filepath = os.path.join(output_cellcenter_dir, filename)
-            tif.imwrite(filepath, slice_2d)
-            print(f"Saved {len(cellcenters_proj_crop)} slices to '{output_cellcenter_dir}' directory.")
-        
+        # Add buffer and clip to image bounds
+        zmin = max(zmin - buffer, 0)
+        ymin = max(ymin - buffer, 0)
+        xmin = max(xmin - buffer, 0)
+
+        zmax = min(zmax + buffer + 1, gt.shape[0])  # +1 to include the max index
+        ymax = min(ymax + buffer + 1, gt.shape[1])
+        xmax = min(xmax + buffer + 1, gt.shape[2])
+
+        # Crop image and label
+        img_crop = img[zmin:zmax, ymin:ymax, xmin:xmax]
+        gt_crop = gt[zmin:zmax, ymin:ymax, xmin:xmax]
+
+        img_crop = crop_along_axis(img_crop, slice(0,slice_index), axis=2)
+        gt_crop = crop_along_axis(gt_crop, slice(0,slice_index), axis=2)
+
+        save_3d_slices_in_all_directions(img_crop, gt_crop, output_img_dir, output_val_dir)
+
+
+        # # Save with consistent zero-padded filename
+        # filename = f"cell_{i:05d}.tiff"
+        # filepath = os.path.join(output_inference_img_dir, filename)
+        # tif.imwrite(filepath, img_crop)
+        # print(f"Saved '{filepath}'.")
+
+        # filename = f"cell_{i:05d}_label.tiff"
+        # filepath = os.path.join(output_inference_val_dir, filename)
+        # tif.imwrite(filepath, gt_crop)
+        # print(f"Saved '{filepath}'.")
+
+
         ###crop 3d few shot inference image
 
-    #     img_infer = img[slice_index:]
-    #     gt_infer = gt[slice_index:]
-    #     cellcenters_infer = cellcenters[slice_index:]
+        # img_infer = img[slice_index:]
+        # gt_infer = gt[slice_index:]
+       
+        #upper_cellcenters_proj = project_lower_to_upper(cellcenters, slice_index, axis=axis)
 
-    #     infer_img_path = os.path.join(output_inference_img_dir, f"infer_{i:03d}.tiff")
-    #     infer_gt_path = os.path.join(output_inference_val_dir, f"infer_{i:03d}_label.tiff")
-    #     infer_cellcenter_path = os.path.join(output_inference_cellcenters_dir, f"infer_{i:03d}_cellcenter.tiff")
+        # infer_img_path = os.path.join(output_inference_img_dir, f"infer_{i:03d}.tiff")
+        # infer_gt_path = os.path.join(output_inference_val_dir, f"infer_{i:03d}_label.tiff")
+        #infer_cellcenter_path = os.path.join(output_inference_cellcenters_dir, f"infer_{i:03d}_cellcenter.tiff")
+        
 
-    #     tif.imwrite(infer_img_path, img_infer)
-    #     tif.imwrite(infer_gt_path, gt_infer)
-    #     tif.imwrite(infer_cellcenter_path, cellcenters_infer)
+        # tif.imwrite(infer_img_path, img_infer)
+        # tif.imwrite(infer_gt_path, gt_infer)
+        #tif.imwrite(infer_cellcenter_path, upper_cellcenters_proj)
 
 
     # print(f"Saved inference volume to '{infer_img_path}' and '{infer_gt_path}'.")
+
+def save_3d_slices_in_all_directions(img_crop, gt_crop, output_img_dir, output_val_dir, starting_index=0):
+    """
+    Slices 3D images and masks in Z, Y, and X directions, saves 2D slices with unique filenames,
+    and skips slices where the corresponding mask is completely empty.
+
+    Args:
+        img_crop (ndarray): 3D image, shape (Z, H, W)
+        gt_crop (ndarray): 3D mask, shape (Z, H, W)
+        output_img_dir (str): Path to save 2D image slices
+        output_val_dir (str): Path to save 2D mask slices
+        starting_index (int): Index to start filename numbering from
+    """
+    assert img_crop.shape == gt_crop.shape, "Image and mask must have the same shape"
+    idx = starting_index
+    skipped = 0
+
+    directions = ['Z', 'Y', 'X']
+    slices = [
+        img_crop,                            # Z: axial
+        np.transpose(img_crop, (1, 0, 2)),   # Y: coronal (H, Z, W)
+        np.transpose(img_crop, (2, 0, 1)),   # X: sagittal (W, Z, H)
+    ]
+    masks = [
+        gt_crop,
+        np.transpose(gt_crop, (1, 0, 2)),
+        np.transpose(gt_crop, (2, 0, 1)),
+    ]
+
+    for d, (img_slices, gt_slices) in enumerate(zip(slices, masks)):
+        for i in range(img_slices.shape[0]):
+            img_slice_2d = img_slices[i]
+            gt_slice_2d = gt_slices[i]
+
+            if np.all(gt_slice_2d == 0):
+                skipped += 1
+                continue
+
+            img_filename = f"cell_{idx:05d}.tiff"
+            gt_filename = f"cell_{idx:05d}_label.tiff"
+
+            tif.imwrite(os.path.join(output_img_dir, img_filename), img_slice_2d)
+            tif.imwrite(os.path.join(output_val_dir, gt_filename), gt_slice_2d)
+
+            print(f"[{directions[d]}] Saved slice {idx:05d}")
+            idx += 1
+
+    total_saved = idx - starting_index
+    print(f"\nTotal saved slices: {total_saved}")
+    print(f"Total skipped slices (empty masks): {skipped}")
 
 
 def show_QC_results(img_path, pred_path, gt_path, cellseg_metric, slice_index=25):

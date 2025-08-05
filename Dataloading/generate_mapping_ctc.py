@@ -81,10 +81,9 @@ def add_mapping_to_json(json_file, map_dict):
 if __name__ == "__main__":
     # [!Caution] The paths should be overrided for the local environment!
     parser = argparse.ArgumentParser(description="Mapping files and paths")
-    parser.add_argument("--pred_path", default="../../Datasets/CTC/test_images/zc2dg/fs_train_img", type=str)
-    parser.add_argument("--train_img_path", default="../../Datasets/CTC/test_images/zc2dg/fs_train_img", type=str)
-    parser.add_argument("--train_label_path", default="../../Datasets/CTC/test_images/zc2dg/fs_train_masks", type=str)
-    parser.add_argument("--train_center_path", default="../../Datasets/CTC/test_images/zc2dg/fs_train_cellcenters", type=str)
+    parser.add_argument("--pred_path", default="../../Datasets/CTC/test_images/zc2dg/fs_train_img_y", type=str)
+    parser.add_argument("--train_img_path", default="../../Datasets/CTC/test_images/zc2dg/fs_train_img_y", type=str)
+    parser.add_argument("--train_label_path", default="../../Datasets/CTC/test_images/zc2dg/fs_train_masks_y", type=str)
     parser.add_argument("--data", default="dic_sim", type=str)
     args = parser.parse_args()
 
@@ -100,5 +99,5 @@ if __name__ == "__main__":
     print("\n----------- Path Mapping for Labeled Data is Started... -----------\n")
 
     map_labeled = os.path.join(MAP_DIR, f"mapping_labeled_{args.data}.json")
-    map_dict = official_paths_labeled(args.train_img_path, args.train_label_path, args.train_center_path)
+    map_dict = official_paths_labeled(args.train_img_path, args.train_label_path)#, args.train_center_path)
     add_mapping_to_json(map_labeled, map_dict)

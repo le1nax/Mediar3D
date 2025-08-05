@@ -123,7 +123,7 @@ def show_QC_results(img_path, pred_path, gt_path, cellseg_metric):
         f1_col_idx = cellseg_metric.columns.get_loc('F1_Score')
         iou_col_idx = cellseg_metric.columns.get_loc('IoU')
 
-        slice_idx = 25  # Start with slice ..
+        slice_idx = 2  # Start with slice ..
         image_idx = 0
         state = {'image_idx': image_idx, 'slice_idx': slice_idx}
 

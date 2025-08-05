@@ -5,6 +5,12 @@ import os, sys
 from tqdm import tqdm
 from monai.inferers import sliding_window_inference
 
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
+from matplotlib.widgets import Slider
+import matplotlib.colors as mcolors
+
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "../../")))
 
 from core.BaseTrainer import BaseTrainer
@@ -12,6 +18,186 @@ from core.MEDIAR.utils import *
 import matplotlib.pyplot as plt
 
 __all__ = ["Trainer"]
+
+def pad_to_multiple(tensor, multiple=32):
+    _, h, w = tensor.shape  # tensor shape is [C, H, W]
+    pad_h = (multiple - h % multiple) % multiple
+    pad_w = (multiple - w % multiple) % multiple
+
+    pad_top = pad_h // 2
+    pad_bottom = pad_h - pad_top
+    pad_left = pad_w // 2
+    pad_right = pad_w - pad_left
+
+    return nn.functional.pad(tensor, (pad_left, pad_right, pad_top, pad_bottom), mode="constant", value=0)
+
+def plot_image(image, title='Image', slice_idx=None, cmap='gray'):
+    """
+    Plot a 2D image or a slice from a 3D image.
+
+    Parameters:
+        image (np.ndarray): Image data (2D or 3D).
+        title (str): Plot title.
+        slice_idx (int): Index of the slice to show if image is 3D. If None, shows middle slice.
+        cmap (str): Colormap to use.
+    """
+    if image.ndim == 2:
+        plt.imshow(image, cmap=cmap)
+        plt.title(title)
+        plt.axis('off')
+        plt.show()
+
+    elif image.ndim == 3:
+        if slice_idx is None:
+            slice_idx = image.shape[0] // 2
+        plt.imshow(image[slice_idx], cmap=cmap)
+        plt.title(f"{title} (slice {slice_idx})")
+        plt.axis('off')
+        plt.show()
+
+    else:
+        raise ValueError("Image must be 2D or 3D numpy array.")
+    
+
+def plot_overlay_image(image1, image2, title='Overlay Image', slice_idx=None, alpha=0.5):
+    """
+    Plot a 2D image with a blue-transparent overlay from another image.
+    
+    Parameters:
+        image1 (np.ndarray): Base image (2D or 3D), shown in 'magma'.
+        image2 (np.ndarray): Overlay image (same shape), shown in blue with transparency.
+        title (str): Plot title.
+        slice_idx (int): Index of the slice to show if 3D. If None, uses middle slice.
+        alpha (float): Opacity of the overlay image (0 to 1).
+    """
+    # Handle 3D inputs
+    if image1.ndim == 3:
+        if slice_idx is None:
+            slice_idx = image1.shape[0] // 2
+        image1 = image1[slice_idx]
+        image2 = image2[slice_idx]
+
+    if image1.shape != image2.shape:
+        raise ValueError("image1 and image2 must have the same shape.")
+
+    plt.figure(figsize=(6, 6))
+    plt.imshow(image1, cmap='Blues')
+    plt.imshow(image2, cmap='magma', alpha=alpha)
+    plt.title(title)
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+    
+def show_QC_results(src_image, pred_image, gt_image):
+    """
+    Show quality control results for a single 2D slice.
+
+    Parameters:
+        src_image (ndarray): 2D source image (grayscale)
+        pred_image (ndarray): 2D predicted segmentation mask (binary or probabilistic)
+        gt_image (ndarray): 2D ground truth mask (binary or probabilistic)
+        cellseg_metric (dict, optional): Dictionary of metric results to optionally show.
+    """
+    # Normalize input image
+    norm = mcolors.Normalize(vmin=np.percentile(src_image, 1), vmax=np.percentile(src_image, 99))
+    mask_norm = mcolors.Normalize(vmin=0, vmax=1)
+
+    # Set up figure and axes
+    fig, axes = plt.subplots(4, 1, figsize=(10, 20))  # Adjusted size for readability
+
+    # 1. Source image
+    axes[0].imshow(src_image, norm=norm, cmap='magma', interpolation='nearest')
+    axes[0].set_title('Source Image')
+
+    # 2. Overlay: Source + Prediction
+    axes[1].imshow(src_image, norm=norm, cmap='magma', interpolation='nearest')
+    axes[1].imshow(pred_image, norm=mask_norm, alpha=0.5, cmap='Blues')
+    axes[1].set_title('Overlay: Source + Prediction')
+
+    # 3. Prediction only
+    axes[2].imshow(pred_image, cmap='Blues', norm=mask_norm, interpolation='nearest')
+    axes[2].set_title('Prediction')
+
+    # 4. Ground Truth
+    axes[3].imshow(gt_image, interpolation='nearest', norm=mask_norm, cmap='Greens')
+
+
+    for ax in axes:
+        ax.axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
+def compare_flows(flow_pred, flow_loaded, atol=1e-5, rtol=1e-3):
+    """
+    Compares two flow tensors or arrays. Assumes both are [B, C, H, W].
+    Automatically converts numpy arrays to tensors and moves them to the same device.
+    """
+    if isinstance(flow_pred, np.ndarray):
+        flow_pred = torch.from_numpy(flow_pred)
+
+    if isinstance(flow_loaded, np.ndarray):
+        flow_loaded = torch.from_numpy(flow_loaded)
+
+    # Ensure same device
+    flow_pred = flow_pred.to(flow_loaded.device)
+
+    if flow_pred.shape != flow_loaded.shape:
+        print(f"Shape mismatch: predicted {flow_pred.shape}, loaded {flow_loaded.shape}")
+        return False
+
+    equal = torch.allclose(flow_pred, flow_loaded, atol=atol, rtol=rtol)
+
+    if not equal:
+        diff = (flow_pred - flow_loaded).abs()
+        print(f"Flow mismatch! Max diff: {diff.max().item():.6f}, Mean diff: {diff.mean().item():.6f}")
+    else:
+        print("Flows match.")
+    
+    return equal
+
+def plot_imageSlider(image, cmap='gray', title=''):
+    
+
+    # Set up figure and axes
+    fig, ax = plt.subplots(figsize=(6, 6))
+    plt.subplots_adjust(bottom=0.25)  # Leave space for slider
+
+    # Display image with log scale
+    im = ax.imshow(image, cmap='magma', norm=LogNorm(vmin=1e-4, vmax=1))
+    fig.colorbar(im, ax=ax, label='Cell Probability')
+    ax.set_title('Interactive Thresholding')
+    ax.axis('off')
+
+    # Add a slider axis below the plot
+    ax_slider = plt.axes([0.2, 0.1, 0.65, 0.03])  # [left, bottom, width, height]
+    threshold_slider = Slider(
+        ax=ax_slider,
+        label='Threshold',
+        valmin=1e-4,
+        valmax=1,
+        valinit=1e-4,
+        valstep=1e-4
+    )
+
+    # Update function for the slider
+    def update(val):
+        threshold = threshold_slider.val
+        masked_image = np.copy(image)
+        masked_image[masked_image < threshold] = 0
+        im.set_data(masked_image)
+        fig.canvas.draw_idle()
+
+    # Connect slider to update function
+    threshold_slider.on_changed(update)
+
+    # Show the window
+    plt.show()
+        
+
+def _sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
 
 
 class Trainer(BaseTrainer):
@@ -76,56 +262,168 @@ class Trainer(BaseTrainer):
         dilated = (dilated > 0).float()  # binarize
 
         return dilated
+    
 
-    def mediar_criterion(self, outputs, labels_onehot_flows, center_mask=None, radius=8):
+    def mediar_criterion(self, outputs, labels_onehot_flows):
         """
-        outputs: [B, C=3, H, W]
-        labels_onehot_flows: numpy array of shape [B, C=3, H, W]
-        center_mask: [B, 1, H, W] binary tensor of detected centers (from detection model), optional
-        radius: radius around each center to supervise cellprob
+        outputs: [B, C=4, H, W] => [flow_x, flow_y, flow_z (if 3D), cellprob]
+        labels_onehot_flows: numpy array of shape [B, C=4, H, W]
         """
 
-        # Move numpy inputs to tensors
-        cellprob_target = torch.from_numpy(labels_onehot_flows[:, 1] > 0.5).to(self.device).float()  # [B, H, W]
-        gradient_flows = torch.from_numpy(labels_onehot_flows[:, 2:]).to(self.device)  # [B, 2, H, W]
+        # Move to tensor
+        cellprob_target = (labels_onehot_flows[:, 1] > 0.5).to(self.device).float()  # [B, H, W]
+        gradient_flows = (labels_onehot_flows[:, 2:]).to(self.device)  # [B, 2 or 3, H, W]
 
-        # Cell Probability Prediction
+        # Get prediction
         cellprob_pred = outputs[:, -1]  # [B, H, W]
+        flow_pred = outputs[:, :gradient_flows.shape[1]]  # [B, 2 or 3, H, W]
+        #plot_image(flow_pred[0,0].cpu().detach().numpy())
+        # --- Supervision Mask ---
+        supervision_mask = (cellprob_target > 0.5).float().unsqueeze(1)  # [B, 1, H, W]
 
-        # ---- Cell Probability Loss (Masked if center_mask provided) ----
-        if center_mask is not None:
-            # [B, 1, H, W] -> [B, H, W]
-            mask = self.create_center_mask(center_mask, radius=radius).squeeze(1)
+        # DILATE: use max pooling to grow the mask region
+        dilation_size = 111  # odd number; use 3, 5, or 7 depending on how much extension you want
+        supervision_mask_dilated = torch.nn.functional.max_pool2d(
+            supervision_mask, kernel_size=dilation_size, stride=1, padding=dilation_size // 2
+        ).squeeze(1)  # [B, H, W]
 
-            per_pixel_loss = nn.functional.binary_cross_entropy_with_logits(
-                cellprob_pred, cellprob_target, reduction='none'
-            )
+        # ---- Cell Probability Loss ----
+        bce_loss = torch.nn.functional.binary_cross_entropy_with_logits(cellprob_pred, cellprob_target)#, reduction='none')
+        #cellprob_loss = (bce_loss * supervision_mask_dilated).sum() / supervision_mask_dilated.sum().clamp(min=1.0)
 
-            # Apply mask
-            per_pixel_loss = per_pixel_loss.cpu()
-            mask = mask.cpu()
-            cellprob_loss = (per_pixel_loss * mask).sum() / mask.sum().clamp(min=1.0)
-        else:
-            cellprob_loss = self.bce_loss(cellprob_pred, cellprob_target)
-
-        # ---- Flow Loss (Masked to foreground regions only) ----
-        flow_pred = outputs[:, :2]  # [B, 2, H, W]
-        flow_mask = (cellprob_target > 0.5).float().unsqueeze(1).repeat(1, 2, 1, 1)  # [B, 2, H, W]
+        # ---- Flow Loss ----
+        flow_mask = supervision_mask_dilated.unsqueeze(1).repeat(1, flow_pred.shape[1], 1, 1)  # [B, C, H, W]
 
         flow_pred_masked = flow_pred * flow_mask
-        gradient_flows_masked = 5.0 * gradient_flows * flow_mask
+        #gradient_flows_masked = 5* gradient_flows * flow_mask
+        gradient_flows = 5* gradient_flows
 
-        # MSE loss only on foreground
-        mse = nn.functional.mse_loss(flow_pred_masked, gradient_flows_masked, reduction='sum')
+
+        mse = torch.nn.functional.mse_loss(flow_pred, gradient_flows)#, reduction='sum')
         denom = flow_mask.sum().clamp(min=1.0)
-        gradflow_loss = 0.5 * (mse / denom)
+        gradflow_loss = 0.5 * (mse / denom) 
 
-        return cellprob_loss + gradflow_loss
+        return bce_loss, mse * 0.5
+
+    def _crop_to_ROI(self, images, labels, flows=None, center_masks=None):
+        """
+        Crop each image in the batch to the ROI of its label and pad to common size divisible by 32.
+        Returns cropped and padded images, labels, center_masks, and flows (if given).
+        
+        images, labels, center_masks shape: [B, C, H, W]
+        flows shape (if given): [B, H, W, C]
+        """
+        cropped_images = []
+        cropped_labels = []
+        cropped_center_masks = []
+        cropped_flows = []
+
+        for b in range(images.shape[0]):
+            label = labels[b, 0]  # [H, W]
+            nonzero = (label > 0).nonzero(as_tuple=False)  # [N, 2]
+
+            if nonzero.shape[0] == 0:
+                cropped_images.append(images[b])
+                cropped_labels.append(labels[b])
+                if center_masks is not None:
+                    cropped_center_masks.append(center_masks[b])
+                if flows is not None:
+                    cropped_flows.append(flows[b])
+                continue
+
+            y_min = nonzero[:, 0].min().item()
+            y_max = nonzero[:, 0].max().item()
+            x_min = nonzero[:, 1].min().item()
+            x_max = nonzero[:, 1].max().item()
+
+            buffer = 20
+            H, W = label.shape
+            y_start = max(y_min - buffer, 0)
+            y_end   = min(y_max + buffer, H)
+            x_start = max(x_min - buffer, 0)
+            x_end   = min(x_max + buffer, W)
+
+            # Crop images, labels, center_masks (channels first)
+            cropped_images.append(images[b, :, y_start:y_end, x_start:x_end])
+            cropped_labels.append(labels[b, :, y_start:y_end, x_start:x_end])
+            if center_masks is not None:
+                cropped_center_masks.append(center_masks[b, :, y_start:y_end, x_start:x_end])
+
+            # Crop flows (channels last)
+            if flows is not None:
+                cropped_flows.append(flows[b, :, y_start:y_end, x_start:x_end])
+
+        # Compute max spatial dims considering images and flows
+        all_heights = [img.shape[1] for img in cropped_images]  # C,H,W -> H=1
+        all_widths = [img.shape[2] for img in cropped_images]
+
+        if flows is not None:
+            all_heights += [flow.shape[0] for flow in cropped_flows]  # H,W,C -> H=0
+            all_widths += [flow.shape[1] for flow in cropped_flows]
+
+        max_h = max(all_heights)
+        max_w = max(all_widths)
+
+        # Round up to nearest multiple of 32
+        pad_h = ((max_h + 31) // 32) * 32
+        pad_w = ((max_w + 31) // 32) * 32
+
+        def pad_tensor(tensor, is_channels_last=False):
+            if is_channels_last:
+                # tensor shape: [H, W, C]
+                h, w, c = tensor.shape
+                pad_top = (pad_h - h) // 2
+                pad_bottom = pad_h - h - pad_top
+                pad_left = (pad_w - w) // 2
+                pad_right = pad_w - w - pad_left
+                # permute to [C, H, W] for padding, then back
+                padded = torch.nn.functional.pad(
+                    tensor.permute(2, 0, 1),
+                    (pad_left, pad_right, pad_top, pad_bottom),
+                    mode='constant', value=0
+                )
+                return padded.permute(1, 2, 0)  # back to [H, W, C]
+            else:
+                # tensor shape: [C, H, W]
+                c, h, w = tensor.shape
+                pad_top = (pad_h - h) // 2
+                pad_bottom = pad_h - h - pad_top
+                pad_left = (pad_w - w) // 2
+                pad_right = pad_w - w - pad_left
+                return torch.nn.functional.pad(
+                    tensor,
+                    (pad_left, pad_right, pad_top, pad_bottom),
+                    mode='constant',
+                    value=0
+                )
+
+        # Pad images and labels (channels first)
+        padded_images = [pad_tensor(img, is_channels_last=False) for img in cropped_images]
+        padded_labels = [pad_tensor(lbl, is_channels_last=False) for lbl in cropped_labels]
+
+        # Pad center masks if given (channels first)
+        if center_masks is not None:
+            padded_center_masks = [pad_tensor(center, is_channels_last=False) for center in cropped_center_masks]
+
+        # For flows, convert channels last to channels first, pad, keep channels first
+        if flows is not None:
+            padded_flows = [pad_tensor(flow, is_channels_last=False) for flow in cropped_flows]
+
+        # Stack outputs
+        images = torch.stack(padded_images)
+        labels = torch.stack(padded_labels)
+        center_masks = torch.stack(padded_center_masks) if center_masks is not None else None
+        flows = torch.stack(padded_flows) if flows is not None else None
+
+        #return images, labels, flows if flows is not None else None, center_masks if center_masks is not None else None
+        return images, labels, flows
+
 
     def _epoch_phase(self, phase):
         phase_results = {}
 
-        self.loss_metric = []
+        self.loss_flow = []
+        self.loss_cellprob = []
         self.f1_metric = []
         self.iou_metric = []
 
@@ -137,6 +435,7 @@ class Trainer(BaseTrainer):
         for batch_data in tqdm(self.dataloaders[phase]):
             images = batch_data["img"].to(self.device)
             labels = batch_data["label"].to(self.device)
+            flows = batch_data["flow"].to(self.device)
 
             center_masks = batch_data.get("cellcenter", None)
             if center_masks is not None:
@@ -145,74 +444,80 @@ class Trainer(BaseTrainer):
                     center_masks = torch.stack(center_masks, dim=0)
                 center_masks = center_masks.to(self.device)
 
-                if self.with_public:
-                    # Load batches sequentially from the unlabeled dataloader
-                    try:
-                        batch_data = next(self.public_iterator)
-                        images_pub, labels_pub = batch_data["img"], batch_data["label"]
+            if self.with_public: #@todo add precomputed flows
+                # Load batches sequentially from the unlabeled dataloader
+                try:
+                    batch_data = next(self.public_iterator)
+                    images_pub, labels_pub = batch_data["img"], batch_data["label"]
 
-                    except:
-                        # Assign memory loader if the cycle ends
-                        self.public_iterator = iter(self.public_loader)
-                        batch_data = next(self.public_iterator)
-                        images_pub, labels_pub = batch_data["img"], batch_data["label"]
+                except:
+                    # Assign memory loader if the cycle ends
+                    self.public_iterator = iter(self.public_loader)
+                    batch_data = next(self.public_iterator)
+                    images_pub, labels_pub = batch_data["img"], batch_data["label"]
 
-                    # Concat memory data to the batch
-                    images = torch.cat([images, images_pub], dim=0)
-                    labels = torch.cat([labels, labels_pub], dim=0)
+                # Concat memory data to the batch
+                images = torch.cat([images, images_pub], dim=0)
+                labels = torch.cat([labels, labels_pub], dim=0)
 
-                images = images.to(self.device)
-                labels = labels.to(self.device)
 
-                self.optimizer.zero_grad()
+            # plot_image(images[0].cpu().numpy())
+            # plot_image(labels[0].cpu().numpy())
+            images, labels, flows = self._crop_to_ROI(images, labels, flows)
+            # plot_image(images[0].cpu().numpy())
+            # plot_image(labels[0].cpu().numpy())
+            
+            # Forward pass
+            with torch.cuda.amp.autocast(enabled=self.amp):
+                with torch.set_grad_enabled(phase == "train"):
+                    # Output shape is B x [grad y, grad x, cellprob] x H x W
+                    outputs = self._inference(images, phase)
+                    #plot_image(outputs[-1].cpu().detach().numpy())
 
-                # Forward pass
-                with torch.cuda.amp.autocast(enabled=self.amp):
-                    with torch.set_grad_enabled(phase == "train"):
-                        # Output shape is B x [grad y, grad x, cellprob] x H x W
-                        outputs = self._inference(images, phase)
+                    # # Map label masks to graidnet and onehot
+                    labels_onehot_flows = labels_to_flows(
+                        labels, use_gpu=True, device=self.device
+                    )
 
-                        # Map label masks to graidnet and onehot
-                        labels_onehot_flows = labels_to_flows(
-                            labels, use_gpu=True, device=self.device
-                        )
-                        # Calculate loss
-                        loss = self.mediar_criterion(outputs, labels_onehot_flows, center_masks)
-                        self.loss_metric.append(loss)
+                    compare_flows(labels_onehot_flows, flows.to(self.device))
+                    #plot_image(_sigmoid(outputs[0,0,:,:].cpu().detach().numpy()))
+                    #show_QC_results(images[0,0].cpu().numpy(), _sigmoid(outputs[0,-1,:,:].cpu().detach().numpy()), labels[0,-1].cpu().numpy())
 
-                        # Calculate valid statistics
-                        if phase != "train":
-                            outputs, labels = self._post_process(outputs, labels)
-                            iou_score, f1_score = self._get_metrics(outputs, labels)
-                            self.f1_metric.append(f1_score)
-                            self.iou_metric.append(iou_score)
+                    # Calculate loss
+                    loss_prob, loss_flow = self.mediar_criterion(outputs, flows)
+                    loss = loss_prob + loss_flow
+                    self.loss_flow.append(loss_flow)
+                    self.loss_cellprob.append(loss_prob)
 
-                    # Backward pass
-                    if phase == "train":
-                        # For the mixed precision training
-                        if self.amp:
-                            self.scaler.scale(loss).backward()
-                            self.scaler.unscale_(self.optimizer)
-                            self.scaler.step(self.optimizer)
-                            self.scaler.update()
+                    # Calculate valid statistics
+                    if phase != "train":
+                        outputs, labels = self._post_process(outputs, center_masks, labels)
+                        # plot_image(outputs)
+                        # plot_image(labels)
+                        iou_score, f1_score = self._get_metrics(outputs, labels)
+                        self.f1_metric.append(f1_score)
+                        self.iou_metric.append(iou_score)
+                        show_QC_results(images[0, 0].cpu(), outputs[:,:], labels)
 
-                        else:
-                            loss.backward()
-                            self.optimizer.step()
+                # Backward pass
+                if phase == "train":
+                    # For the mixed precision training
+                    if self.amp:
+                        self.scaler.scale(loss).backward()
+                        self.scaler.unscale_(self.optimizer)
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
 
-        # After the loop, calculate average loss
-        avg_loss = torch.stack(self.loss_metric).mean().item() if len(self.loss_metric) > 0 else None
-
-        # Update phase_results with avg loss explicitly
-        if len(self.loss_metric) > 0:
-            avg_loss = torch.stack(self.loss_metric).mean().item()
-        else:
-            avg_loss = None
-        phase_results["dice_loss"] = avg_loss
+                    else:
+                        loss_prob.backward()
+                        self.optimizer.step()
 
         # Update metrics
         phase_results = self._update_results(
-            phase_results, self.loss_metric, "dice_loss", phase
+            phase_results, self.loss_flow, "flow_loss", phase
+        )
+        phase_results = self._update_results(
+            phase_results, self.loss_cellprob, "cellprob bce loss", phase
         )
         if phase != "train":
             phase_results = self._update_results(
@@ -227,7 +532,7 @@ class Trainer(BaseTrainer):
     def _inference(self, images, phase="train"):
         """inference methods for different phase"""
 
-        # images_np = images.detach().cpu().numpy()  # (B, C, H, W)
+        #images_np = images.detach().cpu().numpy()  # (B, C, H, W)
         # for i in range(images_np.shape[0]):
         #     img = images_np[i]
         #     if img.ndim == 3:
@@ -312,12 +617,15 @@ class Trainer(BaseTrainer):
     
         return yf
 
-    def _post_process(self, outputs, labels=None):
+    def _post_process(self, outputs, cellcenters=None,labels=None):
         """Predict cell instances using the gradient tracking"""
         outputs = outputs.squeeze(0).cpu().numpy()
         gradflows, cellprob = outputs[:2], self._sigmoid(outputs[-1])
         outputs = compute_masks(gradflows, cellprob, use_gpu=True, device=self.device)
         outputs = outputs[0]  # (1, C, H, W) -> (C, H, W)
+        
+        # if(cellcenters is not None):
+        #     outputs = filter_false_positives(outputs, cellcenters)
 
         if labels is not None:
             labels = labels.squeeze(0).squeeze(0).cpu().numpy()

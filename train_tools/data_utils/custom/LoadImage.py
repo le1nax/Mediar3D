@@ -56,60 +56,41 @@ class CustomLoadImage(LoadImage):
         self.register(UnifiedITKReader(*args, **kwargs))
 
 
+class CustomLoadImage(LoadImage):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.readers = [UnifiedITKReader(*args, **kwargs)] + self.readers
+
+    def __call__(self, filename, reader=None):
+        img = super().__call__(filename, reader)
+        if isinstance(img, MetaTensor):
+            img.meta["filename_or_obj"] = filename
+        return img
+    
 class CustomLoadImaged(LoadImaged):
-    """
-    Dictionary-based wrapper of `CustomLoadImage`.
-    """
+    def __init__(self, keys, image_only=True, allow_missing_keys=False, *args, **kwargs):
+        super().__init__(keys, image_only=image_only, allow_missing_keys=allow_missing_keys, *args, **kwargs)
+        self._loader = CustomLoadImage(image_only=image_only)
+        self._loader.readers = [UnifiedITKReader(*args, **kwargs)] + self._loader.readers
 
-    def __init__(
-        self,
-        keys: KeysCollection,
-        reader: Optional[Union[ImageReader, str]] = None,
-        dtype: DtypeLike = np.float32,
-        meta_keys: Optional[KeysCollection] = None,
-        meta_key_postfix: str = DEFAULT_POST_FIX,
-        overwriting: bool = False,
-        image_only: bool = False,
-        ensure_channel_first: bool = False,
-        simple_keys=False,
-        allow_missing_keys: bool = False,
-        *args,
-        **kwargs,
-    ) -> None:
-        super(CustomLoadImaged, self).__init__(
-            keys,
-            reader,
-            dtype,
-            meta_keys,
-            meta_key_postfix,
-            overwriting,
-            image_only,
-            ensure_channel_first,
-            simple_keys,
-            allow_missing_keys,
-            *args,
-            **kwargs,
-        )
-
-        # Assign CustomLoader
-        self._loader = CustomLoadImage(
-            reader, image_only, dtype, ensure_channel_first, *args, **kwargs
-        )
-        if not isinstance(meta_key_postfix, str):
-            raise TypeError(
-                f"meta_key_postfix must be a str but is {type(meta_key_postfix).__name__}."
-            )
-        self.meta_keys = (
-            ensure_tuple_rep(None, len(self.keys))
-            if meta_keys is None
-            else ensure_tuple(meta_keys)
-        )
-        if len(self.keys) != len(self.meta_keys):
-            raise ValueError("meta_keys should have the same length as keys.")
-        self.meta_key_postfix = ensure_tuple_rep(meta_key_postfix, len(self.keys))
-        self.overwriting = overwriting
-
-
+    def __call__(self, data):
+        for key in self.keys:
+            if key not in data:
+                continue
+            val = data[key]
+            # Skip loading if value already tensor (assumed loaded)
+            if isinstance(val, torch.Tensor):
+                continue
+            try:
+                data[key] = self._loader(val)
+                if self.image_only and isinstance(data[key], dict):
+                    data[key] = data[key]["image"]
+            except Exception as e:
+                if self.allow_missing_keys:
+                    continue
+                raise e
+        return data
+    
 class UnifiedITKReader(NumpyReader):
     """
     Unified Reader to read ".tif" and ".tiff files".

@@ -532,13 +532,13 @@ def filter_false_positives(pred_mask, cellcenters):
         ndarray: Filtered instance mask with only valid cell instances.
     """
 
-    for i in range(cellcenters.shape[0]):
-        center_slice = cellcenters[i]
+    #for i in range(cellcenters.shape[0]):
+        # center_slice = cellcenters[i]
 
-        # === Debug: count nonzero pixels in current slice ===
-        nonzero_count = np.count_nonzero(center_slice)
-        print(f"Slice {i:03d} — Cell Center Nonzero Count: {nonzero_count}")
-
+        ## === Debug: count nonzero pixels in current slice ===
+        # nonzero_count = np.count_nonzero(center_slice)
+        # print(f"Slice {i:03d} — Cell Center Nonzero Count: {nonzero_count}")
+    cellcenters = cellcenters.squeeze()  # removes all dimensions of size 1
     # Make sure shapes match
     assert pred_mask.shape == cellcenters.shape, "Shape mismatch between pred_mask and cellcenters"
 

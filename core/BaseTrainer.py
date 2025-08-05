@@ -68,6 +68,92 @@ class BaseTrainer:
         )
         self.post_gt = Compose([EnsureType(), AsDiscrete(to_onehot=None)])
 
+    def train_unfreezeme(self, freeze_epochs=30):
+        """Train the model with optional encoder freezing"""
+
+        print_learning_device(self.device)
+        train_losses = []
+        valid_losses = []
+
+        # Freeze encoder
+        print(f">>> Freezing encoder for first {freeze_epochs} epochs")
+        for param in self.model.encoder.parameters():
+            param.requires_grad = False
+
+        # Only use trainable parameters for optimizer
+        self.optimizer = torch.optim.Adam(
+            filter(lambda p: p.requires_grad, self.model.parameters()), lr=1e-4
+        )
+
+        for epoch in range(1, self.num_epochs + 1):
+            print(f"[Round {epoch}/{self.num_epochs}]")
+
+            # Unfreeze encoder if needed
+            if epoch == freeze_epochs + 1:
+                print(f">>> Unfreezing encoder at epoch {epoch}")
+                for param in self.model.encoder.parameters():
+                    param.requires_grad = True
+
+                # Re-initialize optimizer with all parameters
+                self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
+                
+            if epoch % self.valid_frequency == 0 or epoch == 1:
+                if not self.no_valid:
+                    print(">>> Valid Epoch")
+                    valid_results = self._epoch_phase("valid")
+                    print_with_logging(valid_results, epoch)
+
+                    valid_loss = valid_results.get("Valid_Dice_Loss", None)
+                    if valid_loss is not None:
+                        valid_losses.append(valid_loss)
+
+                    if "Valid_F1_Score" in valid_results.keys():
+                        current_f1_score = valid_results["Valid_F1_Score"]
+                        self._update_best_model(current_f1_score)
+                else:
+                    print(">>> TuningSet Epoch")
+                    tuning_cell_counts = self._tuningset_evaluation()
+                    tuning_count_dict = {"TuningSet_Cell_Count": tuning_cell_counts}
+                    print_with_logging(tuning_count_dict, epoch)
+
+                    current_cell_count = tuning_cell_counts
+                    self._update_best_model(current_cell_count)
+
+            print("-" * 50)
+            # Train Epoch Phase
+            print(">>> Train Epoch")
+            train_results = self._epoch_phase("train")
+            print_with_logging(train_results, epoch)
+
+            train_loss = train_results.get("Train_Dice_Loss", None)
+            if train_loss is not None:
+                train_losses.append(train_loss)
+
+            if self.scheduler is not None:
+                self.scheduler.step()
+
+        self.best_f1_score = 0
+
+        # Plotting
+        plt.figure(figsize=(8, 5))
+        plt.plot(train_losses, label="Train Loss")
+        if len(valid_losses) > 0:
+            valid_epochs = list(range(
+                self.valid_frequency,
+                self.valid_frequency * len(valid_losses) + 1,
+                self.valid_frequency,
+            ))
+            plt.plot(valid_epochs, valid_losses, label="Validation Loss")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.title("Training and Validation Loss")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+        if self.best_weights is not None:
+            self.model.load_state_dict(self.best_weights)
+
     def train(self):
         """Train the model"""
 

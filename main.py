@@ -90,6 +90,7 @@ def main(args):
     wandb.watch(trainer.model, log="all", log_graph=True)
 
     # Conduct experiment
+    # trainer.train()
     trainer.train()
 
     save_dir = "../../W_B/MEDIAR_FT"

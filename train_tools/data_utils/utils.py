@@ -1,6 +1,14 @@
-import os
+import sys, os
 import json
 import numpy as np
+import torch
+from tqdm import tqdm
+from pathlib import Path
+import tifffile
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "../../")))
+
+from core.MEDIAR.utils import *
 
 __all__ = ["split_train_valid", "path_decoder"]
 
@@ -68,5 +76,49 @@ def path_decoder(root, mapping_file, no_label=False, unlabeled=False):
 
     if unlabeled:
         data_dicts = [d for d in data_dicts if "00504" not in d["img"]]
+
+    return data_dicts
+
+def add_flows(data_dicts, device="cuda", overwrite=False, save_as_tiff=True):
+    """
+    Adds or computes flow paths based on label paths.
+
+    Args:
+        data_dicts (list[dict]): list of samples from path_decoder
+        device (str): device to run flow computation
+        overwrite (bool): force recompute even if exists
+        save_as_tiff (bool): save flow as .tiff instead of .npy
+
+    Returns:
+        list[dict]: modified list with "flow" key added
+    """
+    for data in tqdm(data_dicts, desc="Checking or generating flows"):
+        if "label" not in data:
+            continue
+
+        # Create "flows" folder inside the labels directory
+        label_path = Path(data["label"])
+        labels_dir = label_path.parent  # folder containing the label
+        flow_dir = labels_dir / "flows"  # flows subfolder inside labels
+
+        flow_dir.mkdir(parents=True, exist_ok=True)
+
+        stem = label_path.stem.replace("_label", "")
+        flow_suffix = "_flow.tiff" if save_as_tiff else "_flow.npy"
+        flow_path = flow_dir / f"{stem}{flow_suffix}"
+
+        if not flow_path.exists() or overwrite:
+            label_img = tifffile.imread(label_path).astype(np.int32)
+            label_tensor = torch.tensor(label_img, dtype=torch.int32, device=device).unsqueeze(0)
+            flows = labels_to_flows(label_tensor, use_gpu=True, device=device)
+            flow_np = flows.squeeze(0)
+
+            if save_as_tiff:
+                flow_np = np.moveaxis(flow_np, 0, -1)
+                tifffile.imwrite(flow_path, flow_np.astype(np.float32))
+            else:
+                np.save(flow_path, flow_np)
+
+        data["flow"] = str(flow_path)
 
     return data_dicts

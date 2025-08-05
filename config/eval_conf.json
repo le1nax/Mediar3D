@@ -2,8 +2,7 @@
     "eval_setups":{
         "img_path": "../../Datasets/CTC/test_images/zc2dg/fs_inference_img",
         "gt_path": "../../Datasets/CTC/test_images/zc2dg/fs_inference_masks",
-        "pred_path": "../../Datasets/CTC/test_images/zc2dg/fs_inference_res_mediar100e",
+        "pred_path": "../../Datasets/CTC/test_images/zc2dg/fs_inference_res_200e_Mediar_no_PP",
         "save_path": "../../Datasets/CTC/sim3d/eval_res"
     }
 }
-

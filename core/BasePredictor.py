@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import time, os
 import tifffile as tif
-
+from pathlib import Path
 from datetime import datetime
 from zipfile import ZipFile
 from pytz import timezone
@@ -66,7 +66,7 @@ class BasePredictor:
                 pred_mask = self._inference3D(img_data)
 
                 cellcenters = None
-                if(self.cellcenters_path is not None):
+                if(self.cellcenters_path is not None and self.cellcenters_path != ""):
                     base, ext = os.path.splitext(img_name)
                     cellcenters_file = os.path.join(self.cellcenters_path, f"{base}_cellcenter{ext}")
                     cellcenters=tif.imread(cellcenters_file)
@@ -104,6 +104,9 @@ class BasePredictor:
         return time_cost
 
     def write_pred_mask(self, pred_mask, output_dir, image_name, submission=False):
+        
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         # All images should contain at least 5 cells
         if submission:

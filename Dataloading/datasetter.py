@@ -2,6 +2,7 @@ from torch.utils.data import DataLoader
 from monai.data import Dataset
 from pathlib import Path
 import pickle
+import numpy as np
 
 from train_tools.data_utils.transforms import (
     train_transforms,
@@ -10,7 +11,7 @@ from train_tools.data_utils.transforms import (
     tuning_transforms,
     unlabeled_transforms,
 )
-from train_tools.data_utils.utils import split_train_valid, path_decoder
+from train_tools.data_utils.utils import split_train_valid, path_decoder, add_flows
 
 DATA_LABEL_DICT_PICKLE_FILE = "./train_tools/data_utils/custom/modalities.pkl"
 
@@ -19,26 +20,68 @@ import torch
 import tifffile
 import os
 
+# class CustomMediarDataset(Dataset):
+#     def __init__(self, data, transform=None):
+#         super().__init__(data, transform)
+
+#     def __getitem__(self, index):
+#         data = dict(self.data[index])  # Make a copy
+
+#         # Check if 'cellcenter' is present
+#         cellcenter_path = data.get("cellcenter", None)
+#         if cellcenter_path is not None:
+#             cellcenter_path = Path(cellcenter_path)
+#             if not cellcenter_path.exists():
+#                 print(f"[Warning] cellcenter file not found at index {index}: {cellcenter_path}")
+#             else:
+#                 data["cellcenter"] = str(cellcenter_path)  # Normalize path if needed
+#         else:
+#             # Remove the key if it's None to avoid transform issues
+#             data.pop("cellcenter", None)
+
+#         if self.transform:
+#             data = self.transform(data)
+
+#         return data
+    
 class CustomMediarDataset(Dataset):
     def __init__(self, data, transform=None):
         super().__init__(data, transform)
 
     def __getitem__(self, index):
-        data = dict(self.data[index])
-    
+        data = dict(self.data[index])  # Make a copy
+
+        # Handle cellcenter paths as before
         cellcenter_path = data.get("cellcenter", None)
-        if cellcenter_path is None:
-            raise FileNotFoundError(f"Missing cellcenter path for index {index}")
+        if cellcenter_path is not None:
+            cellcenter_path = Path(cellcenter_path)
+            if not cellcenter_path.exists():
+                print(f"[Warning] cellcenter file not found at index {index}: {cellcenter_path}")
+            else:
+                data["cellcenter"] = str(cellcenter_path)
+        else:
+            data.pop("cellcenter", None)
 
-        cellcenter_path = Path(cellcenter_path)
-        if not cellcenter_path.exists():
-            raise FileNotFoundError(f"Missing cellcenter file: {cellcenter_path}")
-
+        # --- New: load precomputed flow ---
+        flow_path = data.get("flow", None)
+        if flow_path is not None:
+            flow_path = Path(flow_path)
+            if not flow_path.exists():
+                print(f"[Warning] flow file not found at index {index}: {flow_path}")
+                data.pop("flow", None)
+            else:
+                # Load flow data (assuming numpy .npy, adjust if different)
+                flow_np = tifffile.imread(flow_path)
+                flow_tensor = torch.from_numpy(flow_np).float()
+                data["flow"] = flow_tensor
+        else:
+            data.pop("flow", None)
+            
         if self.transform:
             data = self.transform(data)
 
         return data
-    
+        
 __all__ = [
     "get_dataloaders_labeled",
     "get_dataloaders_public",
@@ -72,6 +115,7 @@ def get_dataloaders_labeled(
 
     # Get list of data dictionaries from decoded paths
     data_dicts = path_decoder(root, mapping_file)
+    data_dicts = add_flows(data_dicts, device="cuda", overwrite=False)
     tuning_dicts = path_decoder(root, tuning_mapping_file, no_label=True)
 
     if amplified:
