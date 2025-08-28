@@ -28,7 +28,7 @@ class MEDIARFormer(MAnet):
             in_channels=in_channels,
             classes=classes,
         )
-
+        self.decoder
         # Remove the default segmentation head as it's not used in this architecture
         self.segmentation_head = None
 
@@ -43,11 +43,37 @@ class MEDIARFormer(MAnet):
         self.gradflow_head = DeepSegmentationHead(
             in_channels=decoder_channels[-1], out_channels=2
         )
+    
+    #Override the check_input_shape method to ensure input shape is compatible with the encoder
+    def check_input_shape(self, x):
+        # Ensure input has correct channel count for the encoder
+        expected_in_ch = getattr(self.encoder, "in_channels", 3)  # default 3 if not defined
+        if x.shape[1] != expected_in_ch:
+            if x.shape[1] == 1 and expected_in_ch == 3:
+                # Repeat the single channel to make it 3 channels
+                x = x.repeat(1, 3, 1, 1)
+            else:
+                raise RuntimeError(
+                    f"Input has {x.shape[1]} channels, but encoder expects {expected_in_ch}."
+                )
+
+        # Check spatial dimensions
+        h, w = x.shape[-2:]
+        output_stride = self.encoder.output_stride
+        if h % output_stride != 0 or w % output_stride != 0:
+            new_h = (h // output_stride + 1) * output_stride if h % output_stride != 0 else h
+            new_w = (w // output_stride + 1) * output_stride if w % output_stride != 0 else w
+            raise RuntimeError(
+                f"Wrong input shape height={h}, width={w}. Expected image height and width "
+                f"divisible by {output_stride}. Consider pad your images to shape ({new_h}, {new_w})."
+            )
+        
+        return x
 
     def forward(self, x):
         """Forward pass through the network"""
         # Ensure the input shape is correct
-        self.check_input_shape(x)
+        x = self.check_input_shape(x)
 
         # Encode the input and then decode it
         features = self.encoder(x)

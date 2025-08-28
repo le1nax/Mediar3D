@@ -537,13 +537,13 @@ class Trainer(BaseTrainer):
         for batch_data in tqdm(self.dataloaders[phase]):
             images = batch_data["img"].to(self.device)
             labels = batch_data["label"].to(self.device)
-            flows = batch_data["flow"]
-
-            # If flows is a list of file paths (str), load them
-            if isinstance(flows[0], str):       
-                flows = [torch.from_numpy(tiff.imread(f)).float().to(self.device) for f in flows]
-            if isinstance(flows, list):
-                flows = torch.stack(flows, dim=0)
+            flows = batch_data.get("flow", None)
+            if flows is not None:
+                # If flows is a list of file paths (str), load them
+                if isinstance(flows[0], str):       
+                    flows = [torch.from_numpy(tiff.imread(f)).float().to(self.device) for f in flows]
+                if isinstance(flows, list):
+                    flows = torch.stack(flows, dim=0)
 
             center_masks = batch_data.get("cellcenter", None)
             if center_masks is not None:
@@ -580,19 +580,19 @@ class Trainer(BaseTrainer):
                 with torch.set_grad_enabled(phase == "train"):
                     # Output shape is B x [grad y, grad x, cellprob] x H x W
                     outputs = self._inference(images, phase)
-                    #plot_image(outputs[-1].cpu().detach().numpy())
+                    plot_image(outputs[-1].cpu().detach().numpy())
 
-                    # # Map label masks to graidnet and onehot
-                    # labels_onehot_flows = labels_to_flows(
-                    #     labels, use_gpu=True, device=self.device
-                    # )
+                    # Map label masks to graidnet and onehot
+                    labels_onehot_flows = labels_to_flows(
+                        labels, use_gpu=True, device=self.device
+                    )
 
                     # compare_flows(labels_onehot_flows, flows.to(self.device))
                     #plot_image(_sigmoid(outputs[0,0,:,:].cpu().detach().numpy()))
                     #show_QC_results(images[0,0].cpu().numpy(), _sigmoid(outputs[0,-2,:,:].cpu().detach().numpy()), labels[0,-1].cpu().numpy())
 
                     # Calculate loss
-                    loss_prob, loss_flow = self.mediar_criterion(outputs, flows)
+                    loss_prob, loss_flow = self.mediar_criterion(outputs, labels_onehot_flows)
                     loss = loss_prob + 3*loss_flow
                     self.loss_flow.append(loss_flow)
                     self.loss_cellprob.append(loss_prob)

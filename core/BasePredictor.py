@@ -69,7 +69,7 @@ class BasePredictor:
                     base, ext = os.path.splitext(img_name)
                     cellcenters_file = os.path.join(self.cellcenters_path, f"{base}_cellcenter{ext}")
                     cellcenters=tif.imread(cellcenters_file)
-                pred_mask = self._post_process3D(pred_mask.squeeze(0).cpu().numpy(), cellcenters)
+                pred_mask = self._post_process3D(pred_mask.squeeze(0).cpu().numpy())
 
             self.write_pred_mask(
                 pred_mask, self.output_path, img_name, self.make_submission
@@ -154,4 +154,7 @@ class BasePredictor:
         raise NotImplementedError
 
     def _post_process3D(self, pred_mask, cellcenters=None):
+        raise NotImplementedError
+    
+    def postprocess_shifted_windows(self, pred, window_size=(128, 128, 128), overlap=0.25):
         raise NotImplementedError

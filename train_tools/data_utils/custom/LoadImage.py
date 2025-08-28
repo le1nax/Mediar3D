@@ -146,7 +146,8 @@ class UnifiedITKReader(NumpyReader):
             elif len(_obj.shape) == 3:
                 if _obj.shape[0] > 3 and _obj.shape[-1] > 3:  # heuristically a (Z, H, W), add channel dimension
                     meta["dimensionality"] = 3
-                    _obj = np.repeat(np.expand_dims(_obj, axis=-1), 3, axis=-1)  # (Z, H, W, 3)
+                    _obj = np.expand_dims(_obj, axis=-1)  # (Z, H, W, 1)
+                    #_obj = np.repeat(np.expand_dims(_obj, axis=-1), 3, axis=-1)  # (Z, H, W, 3)
                 
                 else: 
                     for p in range(3):
