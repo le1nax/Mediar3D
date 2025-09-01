@@ -1,11 +1,11 @@
 {
     "pred_setups":{
         "name": "mediar",
-        "input_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/02_test",
+        "input_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/02_test_subvolume",
         "cellcenters_path": "",
-        "output_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/02_test_res",
+        "output_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/02_test_subvolume_res",
         "make_submission": false,
-        "model_path": "../../W_B/MEDIAR_FT/model_TRIF_200e.pth",
+        "model_path": "../../W_B/MEDIAR_Testing/model_2025-09-01_15-07-59.pth",
         "device": "cuda:0",
         "model":{
             "name": "mediar-former",

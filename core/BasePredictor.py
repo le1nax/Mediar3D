@@ -69,7 +69,7 @@ class BasePredictor:
                     base, ext = os.path.splitext(img_name)
                     cellcenters_file = os.path.join(self.cellcenters_path, f"{base}_cellcenter{ext}")
                     cellcenters=tif.imread(cellcenters_file)
-                pred_mask = self._post_process3D(pred_mask.squeeze(0).cpu().numpy())
+                pred_mask = self._post_process3D(pred_mask.squeeze(0).cpu().numpy(), cellcenters)
 
             self.write_pred_mask(
                 pred_mask, self.output_path, img_name, self.make_submission

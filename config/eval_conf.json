@@ -1,8 +1,9 @@
 {
     "eval_setups":{
-        "img_path": "../../Datasets/CTC/test_images/zc2dg/fs_inference_img",
-        "gt_path": "../../Datasets/CTC/test_images/zc2dg/fs_inference_masks",
-        "pred_path": "../../Datasets/CTC/test_images/zc2dg/fs_inference_res_100e_Mediarclean",
-        "save_path": "../../Datasets/CTC/sim3d/eval_res"
+        "img_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/02_test",
+        "gt_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/ctc/train/challenge_x/02_RES/SEG",
+        "pred_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/ctc/train/challenge_x/02_RES/SEG",
+        "save_path": "../../Datasets/CTC/sim3d/eval_res",
+        "only_pred_overlay": true
     }
 }

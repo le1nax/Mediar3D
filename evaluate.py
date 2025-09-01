@@ -21,6 +21,7 @@ import pandas as pd
 
 def main(args):
     
+    only_pred_overlay = args.eval_setups.only_pred_overlay if 'only_pred_overlay' in args.eval_setups else False
     # Get files from the paths
     gt_path, pred_path, img_path = args.eval_setups.gt_path, args.eval_setups.pred_path, args.eval_setups.img_path
     names = sorted(os.listdir(pred_path))
@@ -77,8 +78,10 @@ def main(args):
         
         images_list.append((src_image, tgt_image))
 
-
-    show_QC_results(img_path, pred_path, gt_path, cellseg_metric)
+    if only_pred_overlay:
+        show_QC_results_visual_inspection(img_path, pred_path)
+    else:
+        show_QC_results(img_path, pred_path, gt_path, cellseg_metric)
 
     # Save results
     # if args.eval_setups.save_path is not None:
@@ -194,6 +197,105 @@ def show_QC_results(img_path, pred_path, gt_path, cellseg_metric):
 
     ax_image_textbox = plt.axes([0.4, 0.1, 0.15, 0.05])
     text_box_image = TextBox(ax_image_textbox, "Image Index:", initial="0")
+    text_box_image.on_submit(lambda text: on_text_submit(text))
+
+    plt.show()
+
+
+def show_QC_results_visual_inspection(img_path, pred_path):
+    print("now comes the plot")
+
+    source_files = sorted([f for f in os.listdir(img_path) if f.endswith(('.tiff', '.tif'))])
+    prediction_files = sorted([f for f in os.listdir(pred_path) if f.endswith(('.tiff', '.tif'))])
+
+    if len(source_files) != len(prediction_files):
+        raise ValueError("The number of source and prediction files must match.")
+
+    images_list = []
+    skipped = 0
+
+    for src_file, pred_file in zip(source_files, prediction_files):
+        src_image = io.imread(os.path.join(img_path, src_file))
+        pred_image = io.imread(os.path.join(pred_path, pred_file))
+
+        if src_image.shape != pred_image.shape:
+            print(f"[Skipped] Shape mismatch:\n - {src_file}: {src_image.shape}\n - {pred_file}: {pred_image.shape}")
+            skipped += 1
+            continue
+
+        images_list.append((src_image, pred_image))
+
+    if not images_list:
+        raise RuntimeError("No images with matching shapes were found. Cannot continue.")
+
+    if skipped > 0:
+        print(f"⚠️ Skipped {skipped} image pairs due to shape mismatches.")
+
+    source_images = np.stack([item[0] for item in images_list])
+    predicted_images = np.stack([item[1] for item in images_list])
+
+    num_images = source_images.shape[0]
+    Image_Z = source_images.shape[1]
+
+    # pick the middle slice for histogram normalization
+    middle_slice = Image_Z // 2
+    norm = mcolors.Normalize(
+        vmin=np.percentile(source_images[0, middle_slice], 1),
+        vmax=np.percentile(source_images[0, middle_slice], 99)
+    )
+    mask_norm = mcolors.Normalize(vmin=0, vmax=1)
+
+    # initial state
+    slice_idx = middle_slice
+    image_idx = 0
+    state = {'image_idx': image_idx, 'slice_idx': slice_idx}
+
+    # --- Plot setup ---
+    fig, axes = plt.subplots(1, 2, figsize=(15, 8))
+
+    im_input = axes[0].imshow(source_images[image_idx, slice_idx], norm=norm, cmap='magma', interpolation='nearest')
+    im_overlay_input = axes[1].imshow(source_images[image_idx, slice_idx], norm=norm, cmap='magma', interpolation='nearest')
+    im_overlay_pred = axes[1].imshow(predicted_images[image_idx, slice_idx], norm=mask_norm, alpha=0.5, cmap='Blues')
+
+    axes[0].set_title(f'Source (Image={image_idx}, Z={slice_idx})')
+    axes[1].set_title("Overlay: Input + Prediction")
+
+    for ax in axes:
+        ax.axis("off")
+
+    # --- Slice slider ---
+    ax_slider = plt.axes([0.2, 0.02, 0.6, 0.02])
+    slider = Slider(ax_slider, "Slice", 0, Image_Z - 1, valinit=slice_idx, valstep=1)
+
+    def update(val):
+        state['slice_idx'] = int(slider.val)
+        slice_idx = state['slice_idx']
+        image_idx = state['image_idx']
+
+        im_input.set_data(source_images[image_idx, slice_idx])
+        im_overlay_input.set_data(source_images[image_idx, slice_idx])
+        im_overlay_pred.set_data(predicted_images[image_idx, slice_idx])
+
+        axes[0].set_title(f'Source (Image={image_idx}, Z={slice_idx})')
+        fig.canvas.draw_idle()
+
+    slider.on_changed(update)
+
+    # --- Image index textbox ---
+    ax_image_textbox = plt.axes([0.4, 0.07, 0.15, 0.05])
+    text_box_image = TextBox(ax_image_textbox, "Image Index:", initial="0")
+
+    def on_text_submit(text):
+        try:
+            image_idx = int(text)
+            if image_idx < 0 or image_idx >= num_images:
+                print(f"Invalid image index: {image_idx}. Please enter a value between 0 and {num_images - 1}.")
+                return
+            state['image_idx'] = image_idx
+            update(slider.val)
+        except ValueError:
+            print("Please enter a valid integer.")
+
     text_box_image.on_submit(lambda text: on_text_submit(text))
 
     plt.show()

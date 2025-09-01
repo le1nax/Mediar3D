@@ -58,8 +58,9 @@ if __name__ == "__main__":
         "--train_img_paths",
         nargs="+",
         default=[
-            "../../Datasets/dummy_dataset/01_img",
-            "../../Datasets/dummy_dataset/02_img"
+            "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/01_img_train",
+            "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/02_test_images_background"
+
         ],
         help="List of image directories"
     )
@@ -67,8 +68,9 @@ if __name__ == "__main__":
         "--train_label_paths",
         nargs="+",
         default=[
-            "../../Datasets/dummy_dataset/01_mask",
-            "../../Datasets/dummy_dataset/02_mask"
+            "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/01_label_train",
+            "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/02_test_labels_background"
+
         ],
         help="List of label directories"
     )
