@@ -2,7 +2,7 @@ import tifffile as tiff
 import numpy as np
 import os
 
-def crop_and_save_slices(input_path, img_out_dir, mask_out_dir, thresh_x, thresh_y):
+def crop_and_save_slices(input_path, img_out_dir, mask_out_dir, thresh_x, thresh_y, thresh_z=50):
     """
     Crop a subvolume from a 3D image stack and save each z-slice separately.
     Also saves empty masks with the same shape in another directory.
@@ -17,7 +17,7 @@ def crop_and_save_slices(input_path, img_out_dir, mask_out_dir, thresh_x, thresh
     print(f"Loaded image shape: {img.shape}")
 
     # Crop subvolume
-    cropped = img[:, :thresh_y+1, :thresh_x+1]  # [Z, newY, newX]
+    cropped = img[:thresh_z+1, :thresh_y+1, :thresh_x+1]  # [Z, newY, newX]
     print(f"Cropped subvolume shape: {cropped.shape}")
 
     # Create output directories
@@ -39,9 +39,9 @@ def crop_and_save_slices(input_path, img_out_dir, mask_out_dir, thresh_x, thresh
 
 
 if __name__ == "__main__":
-    input_path = "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/02_test/t000.tiff"
-    img_out_dir = "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/02_test_images_background"
-    mask_out_dir = "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/02_test_labels_background"
+    input_path = "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/01_test/t000.tiff"
+    img_out_dir = "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/01_test_images_background"
+    mask_out_dir = "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/01_test_labels_background"
 
     thresh_x = 88
     thresh_y = 88

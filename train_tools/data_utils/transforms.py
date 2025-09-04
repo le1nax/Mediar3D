@@ -23,17 +23,17 @@ train_transforms = Compose(
         RemoveRepeatedChanneld(keys=["label"], repeats=3),
         ScaleIntensityd(keys=["img"], allow_missing_keys=True),
 
-        # RandZoomd(
-        #     keys=["img", "label", "cellcenter", "flow"],
-        #     prob=0.5,
-        #     min_zoom=0.25,
-        #     max_zoom=1.5,
-        #     mode=["area", "nearest", "nearest", "area"],
-        #     keep_size=False,
-        #     allow_missing_keys=True,
-        # ),
-        SpatialPadd(keys=["img", "label", "cellcenter", "flow"], spatial_size=2000, allow_missing_keys=True),
-        #RandSpatialCropd(keys=["img", "label", "cellcenter", "flow"], roi_size=512, random_size=False, allow_missing_keys=True),
+        RandZoomd(
+            keys=["img", "label", "cellcenter", "flow"],
+            prob=0.5,
+            min_zoom=0.25,
+            max_zoom=1.5,
+            mode=["area", "nearest", "nearest", "area"],
+            keep_size=False,
+            allow_missing_keys=True,
+        ),
+        SpatialPadd(keys=["img", "label", "cellcenter", "flow"], spatial_size=512, allow_missing_keys=True),
+        RandSpatialCropd(keys=["img", "label", "cellcenter", "flow"], roi_size=512, random_size=False, allow_missing_keys=True),
         RandAxisFlipd(keys=["img", "label", "cellcenter", "flow"], prob=0.5, allow_missing_keys=True),
         RandRotate90d(keys=["img", "label", "cellcenter", "flow"], prob=0.5, spatial_axes=[0, 1], allow_missing_keys=True),
 
@@ -87,7 +87,7 @@ valid_transforms = Compose(
         RemoveRepeatedChanneld(keys=["label"], repeats=3),
         ScaleIntensityd(keys=["img"], allow_missing_keys=True),
         EnsureTyped(keys=["img", "label", "cellcenter", "flow"], allow_missing_keys=True),
-        SpatialPadd(keys=["img", "label", "cellcenter", "flow"], spatial_size=2000, allow_missing_keys=True),
+       # SpatialPadd(keys=["img", "label", "cellcenter", "flow"], spatial_size=2000, allow_missing_keys=True),
     ]
 )
 

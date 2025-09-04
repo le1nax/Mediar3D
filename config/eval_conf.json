@@ -1,8 +1,8 @@
 {
     "eval_setups":{
-        "img_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/02_test",
-        "gt_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/ctc/train/challenge_x/02_RES/SEG",
-        "pred_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/ctc/train/challenge_x/02_RES/SEG",
+        "img_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/02_test_subvolume",
+        "gt_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/02_test_subvolume_res_hiera",
+        "pred_path": "../../Datasets/CTC/Fluo-N3DL-TRIF/02_test_subvolume_res_hiera",
         "save_path": "../../Datasets/CTC/sim3d/eval_res",
         "only_pred_overlay": true
     }

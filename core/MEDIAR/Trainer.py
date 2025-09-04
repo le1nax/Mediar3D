@@ -410,43 +410,61 @@ class Trainer(BaseTrainer):
 
     #     return cellprob_loss, 0.05 * gradflow_loss
 
-    def mediar_criterion(self, outputs, labels_onehot_flows, dilation_iters=10):
-        """Loss function between true labels and prediction outputs with partial annotations support."""
+    # def mediar_criterion(self, outputs, labels_onehot_flows, dilation_iters=10):
+    #     """Loss function between true labels and prediction outputs with partial annotations support."""
 
-        # --- Ensure tensor ---
-        if isinstance(labels_onehot_flows, np.ndarray):
-            labels_onehot_flows = torch.from_numpy(labels_onehot_flows).to(self.device)
-        else:
-            labels_onehot_flows = labels_onehot_flows.to(self.device)
+    #     # --- Ensure tensor ---
+    #     if isinstance(labels_onehot_flows, np.ndarray):
+    #         labels_onehot_flows = torch.from_numpy(labels_onehot_flows).to(self.device)
+    #     else:
+    #         labels_onehot_flows = labels_onehot_flows.to(self.device)
 
-        # --- Build ground truth tensors ---
-        gt_cellprob = (labels_onehot_flows[:, 1] > 0.5).float()   # (B,H,W)
-        gt_flows = labels_onehot_flows[:, 2:].float()             # (B,2,H,W)
+    #     # --- Build ground truth tensors ---
+    #     gt_cellprob = (labels_onehot_flows[:, 1] > 0.5).float()   # (B,H,W)
+    #     gt_flows = labels_onehot_flows[:, 2:].float()             # (B,2,H,W)
 
-        # --- Supervision mask (initially: only where annotations exist) ---
-        supervision_mask = gt_cellprob.clone()
+    #     # --- Supervision mask (initially: only where annotations exist) ---
+    #     supervision_mask = gt_cellprob.clone()
 
-        # --- Special case: background-only slices (no labels) ---
-        if supervision_mask.sum() == 0:
-            # Use full image as supervision mask
-            supervision_mask = torch.ones_like(supervision_mask, device=self.device)
+    #     # --- Special case: background-only slices (no labels) ---
+    #     if supervision_mask.sum() == 0:
+    #         # Use full image as supervision mask
+    #         supervision_mask = torch.ones_like(supervision_mask, device=self.device)
 
-        # --- Dilate mask if needed ---
-        elif dilation_iters > 0:
-            mask_np = supervision_mask.cpu().numpy()
-            mask_np = np.stack([binary_dilation(m, iterations=dilation_iters) for m in mask_np])
-            supervision_mask = torch.from_numpy(mask_np).to(self.device).float()
+    #     # --- Dilate mask if needed ---
+    #     elif dilation_iters > 0:
+    #         mask_np = supervision_mask.cpu().numpy()
+    #         mask_np = np.stack([binary_dilation(m, iterations=dilation_iters) for m in mask_np])
+    #         supervision_mask = torch.from_numpy(mask_np).to(self.device).float()
 
-        # --- Cell Recognition Loss (BCE masked) ---
-        raw_bce = F.binary_cross_entropy_with_logits(outputs[:, -1], gt_cellprob, reduction="none")
-        cellprob_loss = (raw_bce * supervision_mask).sum() / (supervision_mask.sum() + 1e-6)
+    #     # --- Cell Recognition Loss (BCE masked) ---
+    #     raw_bce = F.binary_cross_entropy_with_logits(outputs[:, -1], gt_cellprob, reduction="none")
+    #     cellprob_loss = (raw_bce * supervision_mask).sum() / (supervision_mask.sum() + 1e-6)
 
-        # --- Cell Distinction Loss (Flow masked MSE) ---
-        raw_mse = F.mse_loss(outputs[:, :2], 5.0 * gt_flows, reduction="none")  # (B,2,H,W)
-        mask_flows = supervision_mask.unsqueeze(1)  # (B,1,H,W)
-        gradflow_loss = (raw_mse * mask_flows).sum() / (mask_flows.sum() + 1e-6)
+    #     # --- Cell Distinction Loss (Flow masked MSE) ---
+    #     raw_mse = F.mse_loss(outputs[:, :2], 5.0 * gt_flows, reduction="none")  # (B,2,H,W)
+    #     mask_flows = supervision_mask.unsqueeze(1)  # (B,1,H,W)
+    #     gradflow_loss = (raw_mse * mask_flows).sum() / (mask_flows.sum() + 1e-6)
 
-        return cellprob_loss, 0.05 * gradflow_loss
+    #     return cellprob_loss, 0.05 * gradflow_loss
+    def mediar_criterion(self, outputs, labels_onehot_flows):
+        """loss function between true labels and prediction outputs"""
+
+        # Cell Recognition Loss
+        cellprob_loss = self.bce_loss(
+            outputs[:, -1],
+            torch.from_numpy(labels_onehot_flows[:, 1] > 0.5).to(self.device).float(),
+        )
+
+        # Cell Distinction Loss
+        gradient_flows = torch.from_numpy(labels_onehot_flows[:, 2:]).to(self.device)
+        gradflow_loss = self.mse_loss(outputs[:, :2], gradient_flows*5)
+
+        if torch.isnan(cellprob_loss):
+            asdf = 123  #debug
+            #cellprob_loss = torch.tensor(0.0, device=self.device)
+
+        return cellprob_loss, 0.5* gradflow_loss
     
 
 
@@ -614,7 +632,7 @@ class Trainer(BaseTrainer):
 
             #plot_image(images[0].cpu().numpy())
             #plot_image(labels[0].cpu().numpy())
-            images, labels, flows = self._crop_to_ROI(images, labels, flows)
+            #images, labels, flows = self._crop_to_ROI(images, labels, flows) # @todo
             #plot_image(images[0].cpu().numpy())
             #plot_image(labels[0].cpu().numpy())
             
@@ -643,15 +661,17 @@ class Trainer(BaseTrainer):
                     #                 labels[0, 0].detach().cpu().numpy()                  # ground truth
                     #             )
 
-                    loss = loss_prob + 3*loss_flow
+                    loss = loss_prob + loss_flow
                     self.loss_flow.append(loss_flow)
                     self.loss_cellprob.append(loss_prob)
 
-                    # Calculate valid statistics
-                    if phase == "train" and qc_counter % 20 == 0:
+                    if phase == "train" and qc_counter % 800 == 0:
                         outputs, labels = self._post_process(outputs.detach(), center_masks, labels)
+                        for b in range(self.current_bsize):
+                            iou_score, f1_score = self._get_metrics(outputs[b], labels[b])
+                            print(f"  [Train QC]  F1: {f1_score:.3f}, IoU: {iou_score:.3f}")
 
-
+                    qc_counter += 1
                     # Calculate valid statistics
                     if phase != "train":
                         outputs, labels = self._post_process(outputs, center_masks, labels)
