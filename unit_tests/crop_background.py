@@ -2,7 +2,7 @@ import tifffile as tiff
 import numpy as np
 import os
 
-def crop_and_save_slices(input_path, img_out_dir, mask_out_dir, thresh_x, thresh_y, thresh_z=50):
+def crop_and_save_slices(input_path, img_out_dir, mask_out_dir, thresh_x, thresh_y, thresh_z=100):
     """
     Crop a subvolume from a 3D image stack and save each z-slice separately.
     Also saves empty masks with the same shape in another directory.

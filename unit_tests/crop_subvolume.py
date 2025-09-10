@@ -2,8 +2,8 @@ import tifffile as tiff
 import os
 
 # --- Input ---
-input_path = "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/02_test/t000.tiff"
-output_path = "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIF/02_test_subvolume/cropped.tiff"
+input_path = "../../Datasets/CTC/sim3d/01/cell_00004.tif",
+output_path = "../../Datasets/CTC/sim3d/"
 
 # --- Ensure output directory exists ---
 output_dir = os.path.dirname(output_path)
@@ -14,14 +14,14 @@ img = tiff.imread(input_path)   # shape: (z, y, x)
 print(f"Original image shape: {img.shape}")
 
 # --- Crop ---
-z_start, z_end = 300, 350
-z_crop = img[z_start:z_end]
+# z_start, z_end = 300, 350
+z_crop = img[-1]
 
-h, w = z_crop.shape[1], z_crop.shape[2]
-cropped = z_crop[:, :h//2, :w//2]
+# h, w = z_crop.shape[1], z_crop.shape[2]
+# cropped = z_crop[:, :h//2, :w//2]
 
-print(f"Cropped image shape: {cropped.shape}")
+#print(f"Cropped image shape: {cropped.shape}")
 
 # --- Save ---
-tiff.imwrite(output_path, cropped)
+tiff.imwrite(output_path, z_crop)
 print(f"Saved cropped volume to {output_path}")

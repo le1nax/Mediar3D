@@ -22,8 +22,16 @@ import pandas as pd
 def main(args):
     
     only_pred_overlay = args.eval_setups.only_pred_overlay if 'only_pred_overlay' in args.eval_setups else False
+
+    pred_path, img_path = args.eval_setups.pred_path, args.eval_setups.img_path
+
+
     # Get files from the paths
-    gt_path, pred_path, img_path = args.eval_setups.gt_path, args.eval_setups.pred_path, args.eval_setups.img_path
+    if only_pred_overlay:
+        show_QC_results_visual_inspection(img_path, pred_path)
+        return
+
+    gt_path = args.eval_setups.gt_path
     names = sorted(os.listdir(pred_path))
 
     names_total = []
@@ -33,8 +41,10 @@ def main(args):
         assert name.endswith("_label.tiff"), "The suffix of label name should be _label.tiff"
 
         # Load images
+
         gt = io.imread(os.path.join(gt_path, name))
         pred = io.imread(os.path.join(pred_path, name))
+
 
         # Evaluate metrics
         iou, precision, recall, f1_score = evaluate_metrics_cellseg(pred, gt, threshold=0.5)
@@ -60,28 +70,7 @@ def main(args):
     print("mean F1 Score:", np.mean(cellseg_metric["F1_Score"]))
         
 
-    ###########Vis
-
-    source_files = [f for f in os.listdir(pred_path) if f.endswith('.tiff') or f.endswith('.tif')]
-    target_files = [f for f in os.listdir(gt_path) if f.endswith('.tiff') or f.endswith('.tif')]
-
-    if len(source_files) != len(target_files):
-        raise ValueError("The number of source and target files does not match.")
-
-    # Initialize arrays to hold the images
-    images_list = []
-
-    # Load all the images from the source and target directories
-    for src_file, tgt_file in zip(source_files, target_files):
-        src_image = io.imread(os.path.join(pred_path, src_file))
-        tgt_image = io.imread(os.path.join(gt_path, tgt_file))
-        
-        images_list.append((src_image, tgt_image))
-
-    if only_pred_overlay:
-        show_QC_results_visual_inspection(img_path, pred_path)
-    else:
-        show_QC_results(img_path, pred_path, gt_path, cellseg_metric)
+    show_QC_results(img_path, pred_path, gt_path, cellseg_metric)
 
     # Save results
     # if args.eval_setups.save_path is not None:

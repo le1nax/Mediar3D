@@ -58,7 +58,6 @@ if __name__ == "__main__":
         "--train_img_paths",
         nargs="+",
         default=[
-            "../../Datasets/CTC/sim3d/fewshot/fs_train_img",
             "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/Cellpose_Data/train_CTC_format/01",
             "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/DSBowl2018/data-science-bowl-2018/stage1_train/CTC_format/01_tiff",
             "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/livecell/images/livecell_train_val_images/A172/CTC_format/01",
@@ -77,12 +76,11 @@ if __name__ == "__main__":
         "--train_label_paths",
         nargs="+",
         default=[
-            "../../Datasets/CTC/sim3d/fewshot/fs_train_masks",
             "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/Cellpose_Data/train_CTC_format/01_ST/SEG",
             "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/DSBowl2018/data-science-bowl-2018/stage1_train/CTC_format/01_GT_tiff/SEG",
             "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/livecell/images/livecell_train_val_images/A172/CTC_format/01_ST/SEG",
             "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/livecell/images/livecell_train_val_images/BT474/CTC_format/01_ST/SEG",
-            "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/livecell/images/livecell_train_val_images/BV2/CTC_format/01",
+            "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/livecell/images/livecell_train_val_images/BV2/CTC_format/01_ST/SEG",
             "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/livecell/images/livecell_train_val_images/Huh7/CTC_format/01_ST/SEG",
             "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/livecell/images/livecell_train_val_images/MCF7/CTC_format/01_ST/SEG",
             "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/livecell/images/livecell_train_val_images/SHSY5Y/CTC_format/01_ST/SEG",

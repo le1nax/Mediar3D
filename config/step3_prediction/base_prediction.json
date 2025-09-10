@@ -1,9 +1,9 @@
 {
     "pred_setups":{
         "name": "mediar",
-        "input_path": "../../Datasets/CTC/sim3d/fewshot/02_fs_inference_img",
+        "input_path": "../../Datasets/CTC/Fluo-N3DL-DRO/02_test",
         "cellcenters_path": "",
-        "output_path": "../../Datasets/CTC/sim3d/fewshot/02_res_mediar_zeroshot",
+        "output_path": "../../Datasets/CTC/Fluo-N3DL-DRO/02_res_mediar",
         "make_submission": false,
         "model_path": "../../W_B/MEDIAR_PT/from_phase1.pth",
         "device": "cuda:0",
@@ -12,6 +12,6 @@
             "params": {}
         },
         "exp_name": "mediar_p1_base",
-        "algo_params": {"use_tta": false, "do_3D": true, "cellprob_threshold": 0.1, "plot_prob": false}
+        "algo_params": {"use_tta": false, "do_3D": true, "cellprob_threshold": 0.5, "plot_prob": false}
     }
 }

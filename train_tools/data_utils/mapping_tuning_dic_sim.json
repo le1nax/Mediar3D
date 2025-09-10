@@ -1,0 +1,13 @@
+{
+  "official": [
+    {
+      "img": "../../Datasets/dummy_dataset/01_img/cell_00000.tiff"
+    },
+    {
+      "img": "../../Datasets/dummy_dataset/01_img/cell_00001.tiff"
+    },
+    {
+      "img": "../../Datasets/dummy_dataset/01_img/cell_00002.tiff"
+    }
+  ]
+}
