@@ -213,6 +213,7 @@ class Trainer(BaseTrainer):
         dataloaders,
         optimizer,
         scheduler=None,
+        incomplete_annotations=False,
         criterion=None,
         num_epochs=100,
         device="cuda:0",
@@ -235,6 +236,7 @@ class Trainer(BaseTrainer):
             amp,
             algo_params,
         )
+        self.incomplete_annotations = incomplete_annotations
         self.current_bsize = current_bsize
         self.mse_loss = nn.MSELoss(reduction="mean")
         self.bce_loss = nn.BCEWithLogitsLoss(reduction="mean")
@@ -282,171 +284,45 @@ class Trainer(BaseTrainer):
         return dilated
     
 
-    # def mediar_criterion(self, outputs, labels_onehot_flows):
-    #     """
-    #     outputs: [B, C=4, H, W] => [flow_x, flow_y, flow_z (if 3D), cellprob]
-    #     labels_onehot_flows: numpy array of shape [B, C=4, H, W]
-    #     """
+    def mediar_criterion_incomplete_annotations(self, outputs, labels_onehot_flows, dilation_iters=10):
+        """Loss function between true labels and prediction outputs with partial annotations support."""
 
-    #     # Move to tensor
-    #     cellprob_target = (labels_onehot_flows[:, 1] > 0.5).to(self.device).float()  # [B, H, W]
-    #     gradient_flows = (labels_onehot_flows[:, 2:]).to(self.device)  # [B, 2 or 3, H, W]
+        # --- Ensure tensor ---
+        if isinstance(labels_onehot_flows, np.ndarray):
+            labels_onehot_flows = torch.from_numpy(labels_onehot_flows).to(self.device)
+        else:
+            labels_onehot_flows = labels_onehot_flows.to(self.device)
 
-    #     # Get prediction
-    #     cellprob_pred = outputs[:, -1]  # [B, H, W]
-    #     flow_pred = outputs[:, :gradient_flows.shape[1]]  # [B, 2 or 3, H, W]
-    #     #plot_image(flow_pred[0,0].cpu().detach().numpy())
-    #     # --- Supervision Mask ---
-    #     supervision_mask = (cellprob_target > 0.5).float().unsqueeze(1)  # [B, 1, H, W]
+        # --- Build ground truth tensors ---
+        gt_cellprob = (labels_onehot_flows[:, 1] > 0.5).float()   # (B,H,W)
+        gt_flows = labels_onehot_flows[:, 2:].float()             # (B,2,H,W)
 
-    #     # DILATE: use max pooling to grow the mask region
-    #     dilation_size = 111  # odd number; use 3, 5, or 7 depending on how much extension you want
-    #     supervision_mask_dilated = torch.nn.functional.max_pool2d(
-    #         supervision_mask, kernel_size=dilation_size, stride=1, padding=dilation_size // 2
-    #     ).squeeze(1)  # [B, H, W]
+        # --- Supervision mask (initially: only where annotations exist) ---
+        supervision_mask = gt_cellprob.clone()
 
-    #     # ---- Cell Probability Loss ----
-    #     pos_weight = torch.tensor([15.0], device=self.device)
-    #     bce_loss = torch.nn.functional.binary_cross_entropy_with_logits(cellprob_pred, cellprob_target, pos_weight=pos_weight)#, reduction='none')
-    #     #cellprob_loss = (bce_loss * supervision_mask_dilated).sum() / supervision_mask_dilated.sum().clamp(min=1.0)
+        # --- Special case: background-only slices (no labels) ---
+        if supervision_mask.sum() == 0:
+            # Use full image as supervision mask
+            supervision_mask = torch.ones_like(supervision_mask, device=self.device)
 
-    #     # ---- Flow Loss ----
-    #     flow_mask = supervision_mask_dilated.unsqueeze(1).repeat(1, flow_pred.shape[1], 1, 1)  # [B, C, H, W]
+        # --- Dilate mask if needed ---
+        elif dilation_iters > 0:
+            mask_np = supervision_mask.cpu().numpy()
+            mask_np = np.stack([binary_dilation(m, iterations=dilation_iters) for m in mask_np])
+            supervision_mask = torch.from_numpy(mask_np).to(self.device).float()
 
-    #     flow_pred_masked = flow_pred * flow_mask
-    #     #gradient_flows_masked = 5* gradient_flows * flow_mask
-    #     gradient_flows = 5* gradient_flows
+        # --- Cell Recognition Loss (BCE masked) ---
+        raw_bce = F.binary_cross_entropy_with_logits(outputs[:, -1], gt_cellprob, reduction="none")
+        cellprob_loss = (raw_bce * supervision_mask).sum() / (supervision_mask.sum() + 1e-6)
 
+        # --- Cell Distinction Loss (Flow masked MSE) ---
+        raw_mse = F.mse_loss(outputs[:, :2], 5.0 * gt_flows, reduction="none")  # (B,2,H,W)
+        mask_flows = supervision_mask.unsqueeze(1)  # (B,1,H,W)
+        gradflow_loss = (raw_mse * mask_flows).sum() / (mask_flows.sum() + 1e-6)
 
-    #     mse = torch.nn.functional.mse_loss(flow_pred, gradient_flows)#, reduction='sum')
-    #     denom = flow_mask.sum().clamp(min=1.0)
-    #     gradflow_loss = 0.5 * (mse / denom) 
+        return cellprob_loss, 0.05 * gradflow_loss
+    
 
-
-    #     dice_loss = DiceLoss(sigmoid=True)
-    #     dice_loss_res = dice_loss(cellprob_pred, cellprob_target)
-
-    #     return bce_loss, mse * 0.5, dice_loss_res
-
-    # def mediar_criterion(self, outputs, labels_onehot_flows):
-    #     """
-    #     outputs: [B, C=4, H, W] => [flow_x, flow_y, flow_z (if 3D), cellprob]
-    #     labels_onehot_flows: numpy array of shape [B, C=4, H, W]
-    #     """
-
-    #     # Move to tensor
-    #     cellprob_target = (labels_onehot_flows[:, 1] > 0.5).to(self.device).float()  # [B, H, W]
-    #     gradient_flows = (labels_onehot_flows[:, 2:]).to(self.device)  # [B, 2 or 3, H, W]
-
-    #     # Get prediction
-    #     cellprob_pred = outputs[:, -1]  # [B, H, W]
-    #     flow_pred = outputs[:, :gradient_flows.shape[1]]  # [B, 2 or 3, H, W]
-    #     #plot_image(flow_pred[0,0].cpu().detach().numpy())
-    #     # --- Supervision Mask ---
-    #     supervision_mask = (cellprob_target > 0.5).float().unsqueeze(1)  # [B, 1, H, W]
-
-    #     # DILATE: use max pooling to grow the mask region
-    #     dilation_size = 11  # odd number; use 3, 5, or 7 depending on how much extension you want
-    #     supervision_mask_dilated = torch.nn.functional.max_pool2d(
-    #         supervision_mask, kernel_size=dilation_size, stride=1, padding=dilation_size // 2
-    #     ).squeeze(1)  # [B, H, W]
-
-    #     # ---- Cell Probability Loss ----
-    #     pos_weight = torch.tensor([15.0], device=self.device)
-    #     bce_loss = torch.nn.functional.binary_cross_entropy_with_logits(cellprob_pred, cellprob_target, reduction='none')
-    #     cellprob_loss = (bce_loss * supervision_mask_dilated).sum() / supervision_mask_dilated.sum().clamp(min=1.0)
-
-    #     # ---- Flow Loss ----
-    #     flow_mask = supervision_mask_dilated.unsqueeze(1).repeat(1, flow_pred.shape[1], 1, 1)  # [B, C, H, W]
-
-    #     flow_pred_masked = flow_pred * flow_mask
-    #     gradient_flows_masked = gradient_flows * flow_mask
-
-
-    #     mse = torch.nn.functional.mse_loss(flow_pred_masked, gradient_flows_masked, reduction='sum')
-    #     denom = flow_mask.sum().clamp(min=1.0)
-    #     gradflow_loss = 0.5 * (mse / denom) 
-
-
-    #     dice_loss = DiceLoss(sigmoid=True)
-    #     dice_loss_res = dice_loss(cellprob_pred, cellprob_target)
-
-    #     return cellprob_loss, gradflow_loss, dice_loss_res
-
-    # def mediar_criterion(self, outputs, labels_onehot_flows, dilation_iters=10):
-    #     """Loss function between true labels and prediction outputs with partial annotations support."""
-
-    #     # make sure it's a tensor on the right device
-    #     if isinstance(labels_onehot_flows, np.ndarray):
-    #         labels_onehot_flows = torch.from_numpy(labels_onehot_flows).to(self.device)
-    #     else:
-    #         labels_onehot_flows = labels_onehot_flows.to(self.device)
-
-    #     # --- Build ground truth tensors ---
-    #     gt_cellprob = (labels_onehot_flows[:, 1] > 0.5).float()              # (B,H,W)
-    #     gt_flows = labels_onehot_flows[:, 2:].float()                        # (B,2,H,W)
-
-    #     #if all zero(gt_cellprob):
-    #     # if (gt_cellprob.sum() == 0):
-    #     #     print("all zero gt_cellprob")
-
-    #     # --- Supervision mask (only where annotations exist) ---
-    #     supervision_mask = gt_cellprob.clone()
-        
-
-    #     if dilation_iters > 0:
-    #         mask_np = supervision_mask.cpu().numpy()
-    #         mask_np = np.stack([binary_dilation(m, iterations=dilation_iters) for m in mask_np])
-    #         supervision_mask = torch.from_numpy(mask_np).to(self.device).float()
-
-    #     # --- Cell Recognition Loss (BCE masked) ---
-    #     raw_bce = F.binary_cross_entropy_with_logits(outputs[:, -1], gt_cellprob, reduction="none")
-    #     cellprob_loss = (raw_bce * supervision_mask).sum() / (supervision_mask.sum() + 1e-6)
-
-    #     # --- Cell Distinction Loss (Flow masked MSE) ---
-    #     raw_mse = F.mse_loss(outputs[:, :2], 5.0 * gt_flows, reduction="none")  # (B,2,H,W)
-    #     mask_flows = supervision_mask.unsqueeze(1)  # (B,1,H,W) -> matches (B,2,H,W)
-    #     gradflow_loss = (raw_mse * mask_flows).sum() / (mask_flows.sum() + 1e-6)
-
-    #     return cellprob_loss, 0.05 * gradflow_loss
-
-    # def mediar_criterion(self, outputs, labels_onehot_flows, dilation_iters=10):
-    #     """Loss function between true labels and prediction outputs with partial annotations support."""
-
-    #     # --- Ensure tensor ---
-    #     if isinstance(labels_onehot_flows, np.ndarray):
-    #         labels_onehot_flows = torch.from_numpy(labels_onehot_flows).to(self.device)
-    #     else:
-    #         labels_onehot_flows = labels_onehot_flows.to(self.device)
-
-    #     # --- Build ground truth tensors ---
-    #     gt_cellprob = (labels_onehot_flows[:, 1] > 0.5).float()   # (B,H,W)
-    #     gt_flows = labels_onehot_flows[:, 2:].float()             # (B,2,H,W)
-
-    #     # --- Supervision mask (initially: only where annotations exist) ---
-    #     supervision_mask = gt_cellprob.clone()
-
-    #     # --- Special case: background-only slices (no labels) ---
-    #     if supervision_mask.sum() == 0:
-    #         # Use full image as supervision mask
-    #         supervision_mask = torch.ones_like(supervision_mask, device=self.device)
-
-    #     # --- Dilate mask if needed ---
-    #     elif dilation_iters > 0:
-    #         mask_np = supervision_mask.cpu().numpy()
-    #         mask_np = np.stack([binary_dilation(m, iterations=dilation_iters) for m in mask_np])
-    #         supervision_mask = torch.from_numpy(mask_np).to(self.device).float()
-
-    #     # --- Cell Recognition Loss (BCE masked) ---
-    #     raw_bce = F.binary_cross_entropy_with_logits(outputs[:, -1], gt_cellprob, reduction="none")
-    #     cellprob_loss = (raw_bce * supervision_mask).sum() / (supervision_mask.sum() + 1e-6)
-
-    #     # --- Cell Distinction Loss (Flow masked MSE) ---
-    #     raw_mse = F.mse_loss(outputs[:, :2], 5.0 * gt_flows, reduction="none")  # (B,2,H,W)
-    #     mask_flows = supervision_mask.unsqueeze(1)  # (B,1,H,W)
-    #     gradflow_loss = (raw_mse * mask_flows).sum() / (mask_flows.sum() + 1e-6)
-
-    #     return cellprob_loss, 0.05 * gradflow_loss
     def mediar_criterion(self, outputs, labels_onehot_flows):
         """loss function between true labels and prediction outputs"""
 
@@ -632,7 +508,8 @@ class Trainer(BaseTrainer):
 
             #plot_image(images[0].cpu().numpy())
             #plot_image(labels[0].cpu().numpy())
-            #images, labels, flows = self._crop_to_ROI(images, labels, flows) # @todo
+            if self.incomplete_annotations:
+                images, labels, flows = self._crop_to_ROI(images, labels, flows)
             #plot_image(images[0].cpu().numpy())
             #plot_image(labels[0].cpu().numpy())
             
@@ -654,7 +531,10 @@ class Trainer(BaseTrainer):
                     #show_QC_results(images[0,0].cpu().numpy(), _sigmoid(outputs[0,-2,:,:].cpu().detach().numpy()), labels[0,-1].cpu().numpy())
 
                     # Calculate loss
-                    loss_prob, loss_flow = self.mediar_criterion(outputs, labels_onehot_flows)
+                    if self.incomplete_annotations:
+                        loss_prob, loss_flow = self.mediar_criterion_incomplete_annotations(outputs, labels_onehot_flows, dilation_iters=10)
+                    else:
+                        loss_prob, loss_flow = self.mediar_criterion(outputs, labels_onehot_flows)
                     # show_QC_results(
                     #                 images[0,0].detach().cpu().numpy(),
                     #                 supervision_mask[0].detach().cpu().numpy(),   # prediction (cell prob)

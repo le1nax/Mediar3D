@@ -560,7 +560,7 @@ def filter_false_positives(pred_mask, cellcenters):
 
 
 def compute_masks3D(dP, cellprob, p=None, niter=200, cellprob_threshold=0.0,
-                  flow_threshold=0.4, do_3D=False, min_size=-1,
+                  flow_threshold=0.4, do_3D=False, min_size=10,
                   max_size_fraction=0.4, device=torch.device("cpu")):
     """Compute masks using dynamics from dP and cellprob.
 

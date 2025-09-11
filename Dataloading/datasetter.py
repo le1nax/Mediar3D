@@ -6,6 +6,7 @@ import numpy as np
 
 from train_tools.data_utils.transforms import (
     train_transforms,
+    masked_train_transforms,
     public_transforms,
     valid_transforms,
     tuning_transforms,
@@ -261,6 +262,7 @@ def get_dataloaders_labeled(
     amplified=False,
     relabel=False,
     precompute_flows=False,
+    incomplete_annotations=False
 ):
     """Set DataLoaders for labeled datasets.
 
@@ -307,7 +309,10 @@ def get_dataloaders_labeled(
                 for i in range(50):
                     data_dicts.append(data_points[i % len_data_points])
 
-    data_transforms = train_transforms
+    if incomplete_annotations:
+        data_transforms = masked_train_transforms
+    else:
+        data_transforms = train_transforms
 
     if join_mapping_file is not None:
         data_dicts += path_decoder(root, join_mapping_file)
