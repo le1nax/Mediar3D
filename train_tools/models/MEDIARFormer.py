@@ -28,7 +28,7 @@ class MEDIARFormer(MAnet):
             in_channels=in_channels,
             classes=classes,
         )
-        self.decoder
+        
         # Remove the default segmentation head as it's not used in this architecture
         self.segmentation_head = None
 

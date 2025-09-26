@@ -51,7 +51,7 @@ class CustomLoadImage(LoadImage):
             reader, image_only, dtype, ensure_channel_first, *args, **kwargs
         )
 
-        # Adding TIFFReader. Although ITK Reader supports ".tiff" files, sometimes fails to load images.
+        # Adding TIFFReader. Although ITK Reader supports ".tiff" files, sometimes fails to load images.LoadImage.__call_ MONAI loops over self.readers[::-1] (reversed order) so my UnifiedITKRead should be appended first.
         self.readers = []
         self.register(UnifiedITKReader(*args, **kwargs))
 
@@ -59,7 +59,7 @@ class CustomLoadImage(LoadImage):
 class CustomLoadImage(LoadImage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.readers = [UnifiedITKReader(*args, **kwargs)] + self.readers
+        self.readers = self.readers + [UnifiedITKReader(*args, **kwargs)] #idk why suddently dicom reader grabs my image but appearently 
 
     def __call__(self, filename, reader=None):
         img = super().__call__(filename, reader)

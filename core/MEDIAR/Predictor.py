@@ -6,18 +6,55 @@ from skimage import morphology, measure
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.widgets import Slider
+from matplotlib.widgets import TextBox
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.widgets import Slider
 import matplotlib.colors as mcolors
-
+from skimage import io
 sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "../../")))
 
 from core.BasePredictor import BasePredictor
 from core.MEDIAR.utils import compute_masks, compute_masks3D, filter_false_positives
 
 __all__ = ["Predictor"]
+
+def show_QC_results_visual_inspection(src_image, pred_image):
+    """
+    Show QC visualization for a single source image and its prediction.
+    
+    Args:
+        src_image (np.ndarray): 2D source image (H, W)
+        pred_image (np.ndarray): 2D prediction mask or probability map (H, W)
+    """
+    print("now comes the plot")
+
+    if src_image.shape != pred_image.shape:
+        raise ValueError(f"Shape mismatch: {src_image.shape} vs {pred_image.shape}")
+
+    # normalizations
+    norm = mcolors.Normalize(
+        vmin=np.percentile(src_image, 1),
+        vmax=np.percentile(src_image, 99)
+    )
+    mask_norm = mcolors.Normalize(vmin=0, vmax=1)
+
+    # plot stacked vertically
+    fig, axes = plt.subplots(2, 1, figsize=(8, 10))
+
+    axes[0].imshow(src_image, norm=norm, cmap='magma', interpolation='nearest')
+    axes[0].set_title("Source Image")
+    axes[0].axis("off")
+
+    axes[1].imshow(src_image, norm=norm, cmap='magma', interpolation='nearest')
+    axes[1].imshow(pred_image, norm=mask_norm, alpha=0.5, cmap='Blues')
+    axes[1].set_title("Overlay: Input + Prediction")
+    axes[1].axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
 
 
 def show_QC_results(src_image, pred_image, gt_image):
@@ -335,8 +372,8 @@ class Predictor(BasePredictor):
                     if out.dim() == 2:
                         out = out.unsqueeze(0)
                     out_cpu = out.detach().cpu()  # move result to cpu 
-                    # if(p == 1):
-                    #     show_QC_results(slice_img[0,0].cpu().numpy(), out_cpu[-1].cpu().numpy(), out_cpu[-1].cpu().numpy())
+                    # if(p == 1 and idx > 20):
+                    #     show_QC_results_visual_inspection(slice_img[0,0].cpu().numpy(), out_cpu[-1].cpu().numpy())
 
                     # assume first two channels are in-plane flows, last channel is prob
                     if out_cpu.shape[0] < 2:

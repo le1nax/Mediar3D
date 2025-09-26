@@ -2,7 +2,7 @@
     "eval_setups":{
         "img_path": "../../Datasets/CTC/Fluo-N3DL-DRO/02_test",
         "gt_path": "",
-        "pred_path": "../../Datasets/CTC/Fluo-N3DL-DRO/02_res_mediar",
+        "pred_path": "../../Datasets/CTC/Fluo-N3DL-DRO/02_res_mediar_80ep_instanceCrop",
         "save_path": "../../Datasets/CTC/sim3d/eval_res",
         "only_pred_overlay": true
     }

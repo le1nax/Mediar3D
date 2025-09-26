@@ -1,13 +1,1 @@
-{
-  "official": [
-    {
-      "img": "../../Datasets/dummy_dataset/01_img/cell_00000.tiff"
-    },
-    {
-      "img": "../../Datasets/dummy_dataset/01_img/cell_00001.tiff"
-    },
-    {
-      "img": "../../Datasets/dummy_dataset/01_img/cell_00002.tiff"
-    }
-  ]
-}
+{"official": [{"img": "../../Datasets/CTC/test_images/zc2dg//temp_3dimg/cell_00000.tiff"}, {"img": "../../Datasets/CTC/test_images/zc2dg//temp_3dimg/cell_00001.tiff"}, {"img": "../../Datasets/CTC/test_images/zc2dg//temp_3dimg/cell_00002.tiff"}]}

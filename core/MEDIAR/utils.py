@@ -560,7 +560,7 @@ def filter_false_positives(pred_mask, cellcenters):
 
 
 def compute_masks3D(dP, cellprob, p=None, niter=200, cellprob_threshold=0.0,
-                  flow_threshold=0.4, do_3D=False, min_size=10,
+                  flow_threshold=0.4, do_3D=False, min_size=-1,
                   max_size_fraction=0.4, device=torch.device("cpu")):
     """Compute masks using dynamics from dP and cellprob.
 
@@ -603,7 +603,7 @@ def compute_masks3D(dP, cellprob, p=None, niter=200, cellprob_threshold=0.0,
                                max_size_fraction=max_size_fraction)
         del p_final
         # flow thresholding factored out of get_masks
-        if not do_3D:
+        if not do_3D: #@todo
             if mask.max() > 0 and flow_threshold is not None and flow_threshold > 0:
                 # make sure labels are unique at output of get_masks
                 mask = remove_bad_flow_masks(mask, dP, threshold=flow_threshold,
@@ -619,7 +619,7 @@ def compute_masks3D(dP, cellprob, p=None, niter=200, cellprob_threshold=0.0,
         return mask
     
     if min_size > 0:
-        mask = fill_holes_and_remove_small_masks(mask, min_size=min_size)
+        mask = fill_holes_and_remove_small_masks(mask)
 
     if mask.dtype == np.uint32:
         print(

@@ -9,6 +9,8 @@ import os, sys
 from tqdm import tqdm
 from monai.inferers import sliding_window_inference
 
+from scipy.ndimage import label as connected_components
+
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.widgets import Slider
@@ -37,7 +39,7 @@ def pad_to_multiple(tensor, multiple=32):
 
     return nn.functional.pad(tensor, (pad_left, pad_right, pad_top, pad_bottom), mode="constant", value=0)
 
-def plot_image(image, title='Image', slice_idx=None, cmap='gray'):
+def plot_image(image, title='Image', slice_idx=None, cmap='hsv'):
     """
     Plot a 2D image or a slice from a 3D image.
 
@@ -63,6 +65,42 @@ def plot_image(image, title='Image', slice_idx=None, cmap='gray'):
 
     else:
         raise ValueError("Image must be 2D or 3D numpy array.")
+    
+
+def plot_cellpose_flow(flow, title='Flow'):
+    """
+    Plot a 2D flow field with Cellpose-style coloring (hue = angle, value = magnitude).
+
+    Parameters:
+        flow (np.ndarray): Flow array of shape (2, H, W), where flow[0] = dx, flow[1] = dy.
+        title (str): Plot title.
+    """
+    if flow.ndim != 3 or flow.shape[0] != 2:
+        raise ValueError("Flow must have shape (2, H, W)")
+
+    dx, dy = flow[0], flow[1]
+    mag = np.sqrt(dx**2 + dy**2)
+    ang = np.arctan2(dy, dx)  # angle in radians
+
+    # Normalize magnitude
+    mag = mag / (np.max(mag) + 1e-8)
+
+    # Map angle [-pi, pi] → [0, 1] for hue
+    hue = (ang + np.pi) / (2 * np.pi)
+
+    # HSV image (hue, saturation, value)
+    hsv = np.zeros((flow.shape[1], flow.shape[2], 3), dtype=np.float32)
+    hsv[..., 0] = hue
+    hsv[..., 1] = 1.0
+    hsv[..., 2] = mag
+
+    # Convert HSV → RGB for display
+    rgb = plt.cm.hsv(hsv[..., 0])[:, :, :3] * hsv[..., 2][..., None]
+
+    plt.imshow(rgb)
+    plt.title(title)
+    plt.axis('off')
+    plt.show()
     
 
 def plot_overlay_image(image1, image2, title='Overlay Image', slice_idx=None, alpha=0.5):
@@ -97,19 +135,21 @@ def plot_overlay_image(image1, image2, title='Overlay Image', slice_idx=None, al
 def show_QC_results(src_image, pred_image, gt_image):
     """
     Show quality control results for a single 2D slice.
-
-    Parameters:
-        src_image (ndarray): 2D source image (grayscale)
-        pred_image (ndarray): 2D predicted segmentation mask (binary or probabilistic)
-        gt_image (ndarray): 2D ground truth mask (binary or probabilistic)
-        cellseg_metric (dict, optional): Dictionary of metric results to optionally show.
     """
-    # Normalize input image
-    norm = mcolors.Normalize(vmin=np.percentile(src_image, 1), vmax=np.percentile(src_image, 99))
+
+    # Handle normalization robustly: ignore padded zeros
+    nonzero_vals = src_image[src_image > 0]
+    if nonzero_vals.size > 0:
+        vmin = np.percentile(nonzero_vals, 1)
+        vmax = np.percentile(nonzero_vals, 99)
+    else:
+        vmin, vmax = 0, 1  # fallback in case image is entirely zero
+
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
     mask_norm = mcolors.Normalize(vmin=0, vmax=1)
 
     # Set up figure and axes
-    fig, axes = plt.subplots(4, 1, figsize=(10, 20))  # Adjusted size for readability
+    fig, axes = plt.subplots(4, 1, figsize=(10, 20))
 
     # 1. Source image
     axes[0].imshow(src_image, norm=norm, cmap='magma', interpolation='nearest')
@@ -126,13 +166,47 @@ def show_QC_results(src_image, pred_image, gt_image):
 
     # 4. Ground Truth
     axes[3].imshow(gt_image, interpolation='nearest', norm=mask_norm, cmap='Greens')
-
+    axes[3].set_title('Ground Truth')
 
     for ax in axes:
         ax.axis("off")
 
     plt.tight_layout()
     plt.show()
+
+def remove_zero_padding_2d(tensor: torch.Tensor, threshold: float = 1e-6):
+    """
+    Crop a 2D (C, H, W) tensor to remove zero-padded borders.
+
+    Args:
+        tensor (torch.Tensor): Input tensor (C, H, W)
+        threshold (float): Values with abs <= threshold are considered zero
+
+    Returns:
+        cropped (torch.Tensor): Cropped tensor
+        slices (tuple): Slices used for cropping
+    """
+    if tensor.ndim != 3:
+        raise ValueError("Tensor must be 3D (C, H, W)")
+
+    arr = tensor.cpu().numpy()
+
+    # Detect nonzero pixels across channels using threshold
+    nonzero = np.any(np.abs(arr) > threshold, axis=0)
+
+    if not np.any(nonzero):
+        # No nonzero pixels → return original
+        return tensor, None
+
+    # Find bounding box
+    ys, xs = np.nonzero(nonzero)
+    y_min, y_max = ys.min(), ys.max() + 1
+    x_min, x_max = xs.min(), xs.max() + 1
+
+    slices = (slice(None), slice(y_min, y_max), slice(x_min, x_max))
+    cropped = arr[slices]
+
+    return torch.from_numpy(cropped).to(tensor.device), slices
 
 def compare_flows(flow_pred, flow_loaded, atol=1e-5, rtol=1e-3):
     """
@@ -284,7 +358,7 @@ class Trainer(BaseTrainer):
         return dilated
     
 
-    def mediar_criterion_incomplete_annotations(self, outputs, labels_onehot_flows, dilation_iters=10):
+    def mediar_criterion_incomplete_annotations(self, outputs, labels_onehot_flows, dilation_iters=2):
         """Loss function between true labels and prediction outputs with partial annotations support."""
 
         # --- Ensure tensor ---
@@ -342,7 +416,128 @@ class Trainer(BaseTrainer):
 
         return cellprob_loss, 0.5* gradflow_loss
     
+    def _crop_to_single_instance(self, images, labels, flows=None, center_masks=None, buffer=3):
+        """
+        Crop each image in the batch to a randomly chosen single instance (connected component > 0).
+        If no instance exists, fall back to zero-padding removal (same behavior as _crop_to_ROI).
+        Always pads to nearest multiple of 32.
 
+        images, labels, center_masks: [B, C, H, W]
+        flows (optional): [B, H, W, C]
+        """
+        cropped_images, cropped_labels = [], []
+        cropped_center_masks, cropped_flows = [], []
+
+        for b in range(self.current_bsize):
+            label = labels[b, 0]  # [H, W]
+            nonzero = (label > 0).nonzero(as_tuple=False)
+
+            # --- Case 1: empty label (no mask instances) ---
+            if nonzero.shape[0] == 0:
+                cropped_img, slices = remove_zero_padding_2d(images[b])
+                cropped_images.append(cropped_img)
+
+                if slices is not None:
+                    cropped_labels.append(labels[b][slices])
+                    if center_masks is not None:
+                        cropped_center_masks.append(center_masks[b][slices])
+                    if flows is not None:
+                        cropped_flows.append(flows[b][slices])
+                else:
+                    cropped_labels.append(labels[b])
+                    if center_masks is not None:
+                        cropped_center_masks.append(center_masks[b])
+                    if flows is not None:
+                        cropped_flows.append(flows[b])
+                continue
+
+            # --- Case 2: non-empty label, crop to one random instance ---
+            mask_np = label.cpu().numpy()
+            labeled, num = connected_components(mask_np > 0)
+
+            if num == 0:  # just in case scipy fails
+                raise ValueError("No instances found in mask, although nonzero pixels exist.")
+
+            # pick random instance
+            instance_id = random.randint(1, num)
+            instance_mask = (labeled == instance_id)
+
+            # bounding box of this instance
+            ys, xs = np.where(instance_mask)
+            y_min, y_max = ys.min(), ys.max()
+            x_min, x_max = xs.min(), xs.max()
+
+            H, W = label.shape
+            y_start = max(y_min - buffer, 0)
+            y_end   = min(y_max + buffer, H)
+            x_start = max(x_min - buffer, 0)
+            x_end   = min(x_max + buffer, W)
+
+            # crop
+            cropped_images.append(images[b, :, y_start:y_end, x_start:x_end])
+            cropped_labels.append(labels[b, :, y_start:y_end, x_start:x_end])
+            if center_masks is not None:
+                cropped_center_masks.append(center_masks[b, :, y_start:y_end, x_start:x_end])
+            if flows is not None:
+                cropped_flows.append(flows[b, y_start:y_end, x_start:x_end, :])
+
+        # --- Compute max dims ---
+        all_heights = [img.shape[1] for img in cropped_images]
+        all_widths  = [img.shape[2] for img in cropped_images]
+
+        if flows is not None:
+            all_heights += [flow.shape[0] for flow in cropped_flows]
+            all_widths  += [flow.shape[1] for flow in cropped_flows]
+
+        max_h, max_w = max(all_heights), max(all_widths)
+
+        # Round up to nearest multiple of 32
+        pad_h = ((max_h + 31) // 32) * 32
+        pad_w = ((max_w + 31) // 32) * 32
+
+        # --- Enforce minimum crop size of 512x512 ---
+        pad_h = max(pad_h, 512)
+        pad_w = max(pad_w, 512)
+
+        # --- Pad helper ---
+        def pad_tensor(tensor, is_channels_last=False):
+            if is_channels_last:
+                h, w, c = tensor.shape
+                pad_top = (pad_h - h) // 2
+                pad_bottom = pad_h - h - pad_top
+                pad_left = (pad_w - w) // 2
+                pad_right = pad_w - w - pad_left
+                padded = torch.nn.functional.pad(
+                    tensor.permute(2, 0, 1),
+                    (pad_left, pad_right, pad_top, pad_bottom),
+                    mode='constant', value=0
+                )
+                return padded.permute(1, 2, 0)
+            else:
+                c, h, w = tensor.shape
+                pad_top = (pad_h - h) // 2
+                pad_bottom = pad_h - h - pad_top
+                pad_left = (pad_w - w) // 2
+                pad_right = pad_w - w - pad_left
+                return torch.nn.functional.pad(
+                    tensor,
+                    (pad_left, pad_right, pad_top, pad_bottom),
+                    mode='constant', value=0
+                )
+
+        # --- Pad everything ---
+        padded_images = [pad_tensor(img) for img in cropped_images]
+        padded_labels = [pad_tensor(lbl) for lbl in cropped_labels]
+        padded_center_masks = [pad_tensor(center) for center in cropped_center_masks] if center_masks is not None else None
+        padded_flows = [pad_tensor(flow, is_channels_last=True) for flow in cropped_flows] if flows is not None else None
+
+        # --- Stack ---
+        images = torch.stack(padded_images)
+        labels = torch.stack(padded_labels)
+        center_masks = torch.stack(padded_center_masks) if center_masks is not None else None
+        flows = torch.stack(padded_flows) if flows is not None else None
+
+        return images, labels, flows
 
     def _crop_to_ROI(self, images, labels, flows=None, center_masks=None):
         """
@@ -359,14 +554,33 @@ class Trainer(BaseTrainer):
             label = labels[b, 0]  # [H, W]
             nonzero = (label > 0).nonzero(as_tuple=False)
 
-            # case 1: empty label -> keep full image
+
+
+            # case 1: empty label -> remove zero padding using image crop
             if nonzero.shape[0] == 0:
-                cropped_images.append(images[b])
-                cropped_labels.append(labels[b])
-                if center_masks is not None:
-                    cropped_center_masks.append(center_masks[b])
-                if flows is not None:
-                    cropped_flows.append(flows[b])
+                #plot_image(images[b].cpu().numpy(), title=f"Cropped image {b} before removing zero padding")
+                cropped_img, slices = remove_zero_padding_2d(images[b])
+                #plot_image(cropped_img.cpu().numpy(), title=f"Cropped image {b} after removing zero padding")
+                cropped_images.append(cropped_img)
+
+                if slices is not None:
+                    cropped_labels.append(labels[b][slices])
+                    if center_masks is not None:
+                        cropped_center_masks.append(center_masks[b][slices])
+                    if flows is not None:
+                        cropped_flows.append(flows[b][slices])
+                else:
+                    # nothing nonzero, keep unchanged
+                    cropped_labels.append(labels[b])
+                    if center_masks is not None:
+                        cropped_center_masks.append(center_masks[b])
+                    if flows is not None:
+                        cropped_flows.append(flows[b])
+
+                #print(cropped_img.shape)
+                #if(cropped_img.shape[1] >1900 or cropped_img.shape[2]>1900):
+                #    print(f"Warning: image {b} still very large after removing zero padding: {cropped_img.shape}")
+
                 continue
 
             # # case 2: non-empty, maybe keep full image
@@ -383,6 +597,8 @@ class Trainer(BaseTrainer):
             y_min, y_max = nonzero[:, 0].min().item(), nonzero[:, 0].max().item()
             x_min, x_max = nonzero[:, 1].min().item(), nonzero[:, 1].max().item()
 
+
+
             buffer = 20
             H, W = label.shape
             y_start = max(y_min - buffer, 0)
@@ -390,6 +606,10 @@ class Trainer(BaseTrainer):
             x_start = max(x_min - buffer, 0)
             x_end   = min(x_max + buffer, W)
 
+            #if( y_end - y_start >1900 or x_end - x_start>1900):
+             #   print(f"Warning: image {b} still very large after ROI crop: {y_end - y_start} x {x_end - x_start}")
+            #plot_image(images[b, :, y_start:y_end, x_start:x_end].cpu().numpy())
+            #print(images[b, :, y_start:y_end, x_start:x_end].shape)
             cropped_images.append(images[b, :, y_start:y_end, x_start:x_end])
             cropped_labels.append(labels[b, :, y_start:y_end, x_start:x_end])
             if center_masks is not None:
@@ -509,7 +729,7 @@ class Trainer(BaseTrainer):
             #plot_image(images[0].cpu().numpy())
             #plot_image(labels[0].cpu().numpy())
             if self.incomplete_annotations:
-                images, labels, flows = self._crop_to_ROI(images, labels, flows)
+                images, labels, flows = self._crop_to_single_instance(images, labels, flows)
             #plot_image(images[0].cpu().numpy())
             #plot_image(labels[0].cpu().numpy())
             
@@ -519,7 +739,7 @@ class Trainer(BaseTrainer):
                 with torch.set_grad_enabled(phase == "train"):
                     # Output shape is B x [grad y, grad x, cellprob] x H x W
                     outputs = self._inference(images, phase)
-                    #plot_image(outputs[-1].cpu().detach().numpy())
+                    #plot_image(outputs[0, 0].cpu().detach().numpy())
 
                     # Map label masks to graidnet and onehot
                     labels_onehot_flows = labels_to_flows(
@@ -545,12 +765,18 @@ class Trainer(BaseTrainer):
                     self.loss_flow.append(loss_flow)
                     self.loss_cellprob.append(loss_prob)
 
-                    if phase == "train" and qc_counter % 800 == 0:
-                        outputs, labels = self._post_process(outputs.detach(), center_masks, labels)
+                    if phase == "train":
+                        outputs_postprocessed, labels = self._post_process(outputs.detach(), center_masks, labels)
                         for b in range(self.current_bsize):
-                            iou_score, f1_score = self._get_metrics(outputs[b], labels[b])
+                            iou_score, f1_score = self._get_metrics(outputs_postprocessed[b], labels[b])
                             print(f"  [Train QC]  F1: {f1_score:.3f}, IoU: {iou_score:.3f}")
 
+                            plotting_image = images[b, 0].cpu().numpy()
+                            plotting_pred = outputs[b]
+                            plotting_label = labels[b]
+                            plot_image(labels_onehot_flows[0,2])
+                            #show_QC_results(plotting_image, labels_onehot_flows[b,2].cpu().numpy(), plotting_label)
+                        
                     qc_counter += 1
                     # Calculate valid statistics
                     if phase != "train":
@@ -558,6 +784,10 @@ class Trainer(BaseTrainer):
 
                         # plot_image(outputs)
                         # plot_image(labels)
+                        plotting_image = images[0, 0].cpu().numpy()
+                        plotting_pred = outputs[1]
+                        plotting_label = labels[1]
+                        show_QC_results(plotting_image, plotting_pred, plotting_label)
 
                         for b in range(self.current_bsize):
                             iou_score, f1_score = self._get_metrics(outputs[b], labels[b])
@@ -701,60 +931,6 @@ class Trainer(BaseTrainer):
         plt.tight_layout()
         plt.show()
             
-    def _inference3D(self, img_data):
-        """Conduct model prediction"""
-
-        img_data = img_data.to(self.device)
-        img_base = img_data
-        #Lz, Ly, Lx = shape[:-1]
-        ## @todo Anisotropy 
-        # if anisotropy is not None and anisotropy != 1.0:
-        #     models_logger.info(f"resizing 3D image with anisotropy={anisotropy}")
-        #     x = transforms.resize_image(x.transpose(1,0,2,3),
-        #                             Ly=int(Lz*anisotropy), 
-        #                             Lx=int(Lx)).transpose(1,0,2,3)
-        outputs_base = self.run_3D(img_base)
-        cellprob = outputs_base[-1]
-        dP = outputs_base[:-1]
-
-        pred_mask = torch.cat([dP, cellprob.unsqueeze(0)], dim=0)
-
-        pred_mask = pred_mask.squeeze() ##@todo cpu as in prediction?
-
-        return pred_mask
-        
-    def run_3D(self, imgs): ###@todo channel adapt, batch size adapt
-        
-        #permute images  3012 3102 3201 (put 3 in first becazse window_inference wants NCHW)
-        sstr = ["YX", "ZY", "ZX"]
-        pm = [(3, 0, 1, 2), (3, 1, 0, 2), (3, 2, 0, 1)] 
-        ipm = [(0, 1, 2), (1, 0, 2), (1, 2, 0)]
-        cp = [(1, 2), (0, 2), (0, 1)]
-        cpy = [(0, 1), (0, 1), (0, 1)]
-        shape = imgs.shape[:-1]
-        yf = torch.zeros((4, *shape), dtype=torch.float32, device=self.device)
-        for p in range(3):
-            xsl = imgs.permute(pm[p]) ##images has now CZHW order
-            # per image
-            print("running %s: %d planes of size (%d, %d)" %
-                            (sstr[p], shape[pm[p][1]], shape[pm[p][2]], shape[pm[p][3]]))
-            
-            outputs = []
-            for z in range(shape[pm[p][1]]):  # iterate over Z
-                slice_img = xsl[:, z, :, :].unsqueeze(0)  # shape (1, C, H, W) 
-                out = self._window_inference(slice_img) #shape (3, HW)
-                outputs.append(out.squeeze()) #remove 1st batch dim
-
-            # Stack outputs along Z
-            y = torch.stack(outputs, dim=1)  #shape(3, Z, H, W)
-
-            y_p = y[-1].permute(ipm[p])
-            yf[-1] += y_p
-            for j in range(2):
-                yf[cp[p][j]] += y[cpy[p][j]].permute(ipm[p])
-            y = None; del y
-    
-        return yf
 
     def _post_process(self, outputs, cellcenters=None,labels=None):
         """Predict cell instances using the gradient tracking"""
