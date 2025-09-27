@@ -1,9 +1,9 @@
 {
     "pred_setups":{
         "name": "mediar",
-        "input_path": "../../Datasets/CTC/sim3d/01_test",
+        "input_path": "../../Datasets/CTC/test_images/zc2dg/fs_inference_img",
         "cellcenters_path": "../../Datasets/CTC/test_images/zc2dg/fs_inference_cellcenters",
-        "output_path": "../../Datasets/CTC/test_images/zc2dg/fs_inference_res_200e_Mediar",
+        "output_path": "../../Datasets/CTC/test_images/zc2dg/fs_inference_res_200e_Mediar_test",
         "make_submission": false,
         "model_path": "../../W_B/MEDIAR_PT/from_phase1.pth",
         "device": "cuda:0",

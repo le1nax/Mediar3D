@@ -25,7 +25,7 @@ if len(image_files) != len(mask_files):
 
 # Save with new names
 for i, (img, mask) in enumerate(zip(image_files, mask_files)):
-    new_img_name = f"cell_{i:05d}.tif"
+    new_img_name = f"cell_{i:05d}.png"
     new_mask_name = f"cell_{i:05d}_label.tif"
 
     shutil.copy(img, os.path.join(output_images, new_img_name))

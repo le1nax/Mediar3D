@@ -10,6 +10,8 @@ from monai.data.image_reader import ImageReader, NumpyReader
 from monai.transforms import LoadImage, LoadImaged
 from monai.utils.enums import PostFix
 from monai.data.meta_tensor import MetaTensor
+from pathlib import Path
+
 
 
 DEFAULT_POST_FIX = PostFix.meta()
@@ -23,43 +25,43 @@ __all__ = [
 ]
 
 
-class CustomLoadImage(LoadImage):
-    """
-    Load image file or files from provided path based on reader.
-    If reader is not specified, this class automatically chooses readers
-    based on the supported suffixes and in the following order:
+# class CustomLoadImage(LoadImage):
+#     """
+#     Load image file or files from provided path based on reader.
+#     If reader is not specified, this class automatically chooses readers
+#     based on the supported suffixes and in the following order:
 
-        - User-specified reader at runtime when calling this loader.
-        - User-specified reader in the constructor of `LoadImage`.
-        - Readers from the last to the first in the registered list.
-        - Current default readers: (nii, nii.gz -> NibabelReader), (png, jpg, bmp -> PILReader),
-          (npz, npy -> NumpyReader), (nrrd -> NrrdReader), (DICOM file -> ITKReader).
+#         - User-specified reader at runtime when calling this loader.
+#         - User-specified reader in the constructor of `LoadImage`.
+#         - Readers from the last to the first in the registered list.
+#         - Current default readers: (nii, nii.gz -> NibabelReader), (png, jpg, bmp -> PILReader),
+#           (npz, npy -> NumpyReader), (nrrd -> NrrdReader), (DICOM file -> ITKReader).
 
-    [!Caution] This overriding replaces the original ITK with Custom UnifiedITKReader.
-    """
+#     [!Caution] This overriding replaces the original ITK with Custom UnifiedITKReader.
+#     """
 
-    def __init__(
-        self,
-        reader=None,
-        image_only: bool = False,
-        dtype: DtypeLike = np.float32,
-        ensure_channel_first: bool = False,
-        *args,
-        **kwargs,
-    ) -> None:
-        super(CustomLoadImage, self).__init__(
-            reader, image_only, dtype, ensure_channel_first, *args, **kwargs
-        )
+#     def __init__(
+#         self,
+#         reader=None,
+#         image_only: bool = False,
+#         dtype: DtypeLike = np.float32,
+#         ensure_channel_first: bool = False,
+#         *args,
+#         **kwargs,
+#     ) -> None:
+#         super(CustomLoadImage, self).__init__(
+#             reader, image_only, dtype, ensure_channel_first, *args, **kwargs
+#         )
 
-        # Adding TIFFReader. Although ITK Reader supports ".tiff" files, sometimes fails to load images.LoadImage.__call_ MONAI loops over self.readers[::-1] (reversed order) so my UnifiedITKRead should be appended first.
-        self.readers = []
-        self.register(UnifiedITKReader(*args, **kwargs))
+#         # Adding TIFFReader. Although ITK Reader supports ".tiff" files, sometimes fails to load
+#         self.readers = []
+#         self.register(UnifiedITKReader(*args, **kwargs))
 
 
 class CustomLoadImage(LoadImage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.readers = self.readers + [UnifiedITKReader(*args, **kwargs)] #idk why suddently dicom reader grabs my image but appearently 
+        self.readers = self.readers + [UnifiedITKReader(*args, **kwargs)] #idk why suddently dicom reader grabs my image but appearently images.LoadImage.__call_ MONAI loops over self.readers[::-1] (reversed order) so my UnifiedITKRead should be appended first.
 
     def __call__(self, filename, reader=None):
         img = super().__call__(filename, reader)
@@ -77,18 +79,25 @@ class CustomLoadImaged(LoadImaged):
         for key in self.keys:
             if key not in data:
                 continue
+
             val = data[key]
-            # Skip loading if value already tensor (assumed loaded)
-            if isinstance(val, torch.Tensor):
+
+            # Skip if already tensor or numpy array (already loaded)
+            if isinstance(val, (torch.Tensor, np.ndarray, MetaTensor)):
                 continue
-            try:
-                data[key] = self._loader(val)
-                if self.image_only and isinstance(data[key], dict):
-                    data[key] = data[key]["image"]
-            except Exception as e:
-                if self.allow_missing_keys:
-                    continue
-                raise e
+
+            # If it's a path (string/Path), then load
+            if isinstance(val, (str, Path)):
+                try:
+                    loaded = self._loader(val)
+                    if self._loader.image_only and isinstance(loaded, dict):
+                        loaded = loaded["image"]
+                    data[key] = loaded
+                except Exception as e:
+                    if self.allow_missing_keys:
+                        continue
+                    raise e
+
         return data
     
 class UnifiedITKReader(NumpyReader):
@@ -111,11 +120,15 @@ class UnifiedITKReader(NumpyReader):
         return has_itk or is_supported_format(filename, suffixes)
     
     def move_channel_last(self, axis, obj):
-        """Puts the channel to last"""
-
-        order = [j for j in range(obj.ndim) if j != axis] + [axis] #put axis in last position
-        obj = obj.permute(*order)
-        return obj
+        """Puts the channel axis to last position (works for torch.Tensor or np.ndarray)."""
+        order = [j for j in range(obj.ndim) if j != axis] + [axis]
+        
+        if isinstance(obj, torch.Tensor):
+            return obj.permute(*order)
+        elif isinstance(obj, np.ndarray):
+            return np.transpose(obj, order)
+        else:
+            raise TypeError(f"Unsupported type: {type(obj)}")
 
     def read(self, data: Union[Sequence[PathLike], PathLike], **kwargs):
         """Read Images from the file."""
