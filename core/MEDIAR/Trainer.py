@@ -765,16 +765,16 @@ class Trainer(BaseTrainer):
                     self.loss_flow.append(loss_flow)
                     self.loss_cellprob.append(loss_prob)
 
-                    if phase == "train":
-                        outputs_postprocessed, labels = self._post_process(outputs.detach(), center_masks, labels)
-                        for b in range(self.current_bsize):
-                            iou_score, f1_score = self._get_metrics(outputs_postprocessed[b], labels[b])
-                            print(f"  [Train QC]  F1: {f1_score:.3f}, IoU: {iou_score:.3f}")
+                    # if phase == "train":
+                    #     outputs_postprocessed, labels = self._post_process(outputs.detach(), center_masks, labels)
+                    #     for b in range(self.current_bsize):
+                    #         iou_score, f1_score = self._get_metrics(outputs_postprocessed[b], labels[b])
+                    #         print(f"  [Train QC]  F1: {f1_score:.3f}, IoU: {iou_score:.3f}")
 
-                            plotting_image = images[b, 0].cpu().numpy()
-                            plotting_pred = outputs[b]
-                            plotting_label = labels[b]
-                            plot_image(labels_onehot_flows[0,2])
+                            # plotting_image = images[b, 0].cpu().numpy()
+                            # plotting_pred = outputs[b]
+                            # plotting_label = labels[b]
+                            # plot_image(labels_onehot_flows[0,2])
                             #show_QC_results(plotting_image, labels_onehot_flows[b,2].cpu().numpy(), plotting_label)
                         
                     qc_counter += 1
