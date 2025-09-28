@@ -79,6 +79,8 @@ def main(args):
         world_size = 1
         distributed = False
 
+    print("LOCAL_RANK:", os.environ.get("LOCAL_RANK"))
+
 
     # Initialize W&B
     wandb.init(config=args, **args.wandb_setups)
