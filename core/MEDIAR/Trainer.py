@@ -784,10 +784,10 @@ class Trainer(BaseTrainer):
 
                         # plot_image(outputs)
                         # plot_image(labels)
-                        plotting_image = images[0, 0].cpu().numpy()
-                        plotting_pred = outputs[1]
-                        plotting_label = labels[1]
-                        show_QC_results(plotting_image, plotting_pred, plotting_label)
+                        # plotting_image = images[0, 0].cpu().numpy()
+                        # plotting_pred = outputs[1]
+                        # plotting_label = labels[1]
+                        # show_QC_results(plotting_image, plotting_pred, plotting_label)
 
                         for b in range(self.current_bsize):
                             iou_score, f1_score = self._get_metrics(outputs[b], labels[b])

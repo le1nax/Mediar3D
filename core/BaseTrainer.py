@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from torch import distributed as dist
 from tqdm import tqdm
 from monai.inferers import sliding_window_inference
 from monai.metrics import CumulativeAverage
@@ -120,8 +121,8 @@ class BaseTrainer:
                     self._update_best_model(current_cell_count)
 
             print("-" * 50)
-            # Train Epoch Phase
-            print(">>> Train Epoch")
+            if not dist.is_initialized() or dist.get_rank() == 0:
+                print(">>> Train Epoch")
             train_results = self._epoch_phase("train")
             print_with_logging(train_results, epoch)
 
@@ -189,7 +190,8 @@ class BaseTrainer:
                     self._update_best_model(current_cell_count)
 
             # Train Epoch Phase
-            print(">>> Train Epoch")
+            if not dist.is_initialized() or dist.get_rank() == 0:
+                print(">>> Train Epoch")
             train_results = self._epoch_phase("train")
             print_with_logging(train_results, epoch)
             

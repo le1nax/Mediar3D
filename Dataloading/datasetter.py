@@ -1,4 +1,5 @@
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from monai.data import Dataset
 from pathlib import Path
 import pickle
@@ -262,7 +263,10 @@ def get_dataloaders_labeled(
     amplified=False,
     relabel=False,
     precompute_flows=False,
-    incomplete_annotations=False
+    incomplete_annotations=False,
+    distributed=False,   # <-- NEW ARG
+    rank=0,              # <-- NEW ARG
+    world_size=1,        # <-- NEW ARG
 ):
     """Set DataLoaders for labeled datasets.
 
@@ -333,30 +337,48 @@ def get_dataloaders_labeled(
         data_dicts, valid_portion=valid_portion
     )
 
-    # Obtain datasets with transforms
+     # Datasets
     trainset = CustomMediarDataset(train_dicts, transform=data_transforms)
-    #debug_dataset(trainset, num_samples=5)
     validset = CustomMediarDataset(valid_dicts, transform=valid_transforms)
     tuningset = Dataset(tuning_dicts, transform=tuning_transforms)
 
-    # Set dataloader for Trainset
+    if distributed:
+        train_sampler = DistributedSampler(
+            trainset, num_replicas=world_size, rank=rank, shuffle=True
+        )
+        valid_sampler = DistributedSampler(
+            validset, num_replicas=world_size, rank=rank, shuffle=False
+        ) if len(validset) > 0 else None
+    else:
+        train_sampler, valid_sampler = None, None
+
     train_loader = DataLoader(
-        trainset, batch_size=batch_size, shuffle=True, num_workers=5
+        trainset,
+        batch_size=batch_size,
+        shuffle=(train_sampler is None),
+        sampler=train_sampler,
+        num_workers=5,
+        pin_memory=True,
     )
 
-    # Set dataloader for Validset 
-    valid_loader = DataLoader(validset, batch_size=1, shuffle=False)
+    valid_loader = DataLoader(
+        validset,
+        batch_size=1,
+        shuffle=False,
+        sampler=valid_sampler,
+        num_workers=2,
+        pin_memory=True,
+    )
 
-    # Set dataloader for Tuningset 
-    tuning_loader = DataLoader(tuningset, batch_size=1, shuffle=False)
+    tuning_loader = DataLoader(
+        tuningset, batch_size=1, shuffle=False, num_workers=2, pin_memory=True
+    )
 
-    # Form dataloaders as dictionary
     dataloaders = {
         "train": train_loader,
         "valid": valid_loader,
         "tuning": tuning_loader,
     }
-
     return dataloaders
 
 
