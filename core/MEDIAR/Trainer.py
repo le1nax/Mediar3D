@@ -687,7 +687,7 @@ class Trainer(BaseTrainer):
         # Set model mode
         self.model.train() if phase == "train" else self.model.eval()
 
-        qc_counter = 0  # Reset at the beginning of each phase
+        #qc_counter = 0  # Reset at the beginning of each phase
 
         # Epoch process
         for batch_data in tqdm(self.dataloaders[phase]):
@@ -765,29 +765,29 @@ class Trainer(BaseTrainer):
                     self.loss_flow.append(loss_flow)
                     self.loss_cellprob.append(loss_prob)
 
-                    if phase == "train":
-                        outputs_postprocessed, labels = self._post_process(outputs.detach(), center_masks, labels)
-                        for b in range(self.current_bsize):
-                            iou_score, f1_score = self._get_metrics(outputs_postprocessed[b], labels[b])
-                            print(f"  [Train QC]  F1: {f1_score:.3f}, IoU: {iou_score:.3f}")
+                    # if phase == "train":
+                    #     outputs_postprocessed, labels = self._post_process(outputs.detach(), center_masks, labels)
+                    #     for b in range(self.current_bsize):
+                    #         iou_score, f1_score = self._get_metrics(outputs_postprocessed[b], labels[b])
+                    #         print(f"  [Train QC]  F1: {f1_score:.3f}, IoU: {iou_score:.3f}")
 
-                            plotting_image = images[b, 0].cpu().numpy()
-                            plotting_pred = outputs[b]
-                            plotting_label = labels[b]
-                            plot_image(labels_onehot_flows[0,2])
+                    #         plotting_image = images[b, 0].cpu().numpy()
+                    #         plotting_pred = outputs[b]
+                    #         plotting_label = labels[b]
+                    #         plot_image(labels_onehot_flows[0,2])
                             #show_QC_results(plotting_image, labels_onehot_flows[b,2].cpu().numpy(), plotting_label)
                         
-                    qc_counter += 1
+                    #qc_counter += 1
                     # Calculate valid statistics
                     if phase != "train":
                         outputs, labels = self._post_process(outputs, center_masks, labels)
 
                         # plot_image(outputs)
                         # plot_image(labels)
-                        plotting_image = images[0, 0].cpu().numpy()
-                        plotting_pred = outputs[1]
-                        plotting_label = labels[1]
-                        show_QC_results(plotting_image, plotting_pred, plotting_label)
+                        # plotting_image = images[0, 0].cpu().numpy()
+                        # plotting_pred = outputs[0]
+                        # plotting_label = labels[0]
+                        # show_QC_results(plotting_image, plotting_pred, plotting_label)
 
                         for b in range(self.current_bsize):
                             iou_score, f1_score = self._get_metrics(outputs[b], labels[b])
@@ -936,15 +936,22 @@ class Trainer(BaseTrainer):
         """Predict cell instances using the gradient tracking"""
         outputs_batch = []
         outputs = outputs.cpu().numpy()  # (B, C, H, W)
-        for b in range(self.current_bsize):
-            outputs_b = outputs[b]
-            gradflows, cellprob = outputs_b[:2], self._sigmoid(outputs_b[-1])
-            outputs_b = compute_masks(gradflows, cellprob, use_gpu=True, device=self.device)
-            outputs_b = outputs_b[0]  # (1, C, H, W) -> (C, H, W)
-            outputs_batch.append(outputs_b)
-            # if(cellcenters is not None):
-            # outputs = filter_false_positives(outputs, cellcenters)
-        outputs = np.stack(outputs_batch, axis=0)  # (B, C, H, W)
+        if(outputs.ndim ==4):
+            for b in range(self.current_bsize):
+                outputs_b = outputs[b]
+                gradflows, cellprob = outputs_b[:2], self._sigmoid(outputs_b[-1])
+                outputs_b = compute_masks(gradflows, cellprob, use_gpu=True, device=self.device)
+                outputs_b = outputs_b[0]  # (1, C, H, W) -> (C, H, W)
+                outputs_batch.append(outputs_b)
+                # if(cellcenters is not None):
+                # outputs = filter_false_positives(outputs, cellcenters)
+            outputs = np.stack(outputs_batch, axis=0)  # (B, C, H, W)
+        elif(outputs.ndim ==3):
+            gradflows, cellprob = outputs[:2], self._sigmoid(outputs[-1])
+            outputs = compute_masks(gradflows, cellprob, use_gpu=True, device=self.device)
+            outputs = outputs[0]  # (1, C, H, W) -> (C, H, W)
+        else:
+            raise ValueError("Outputs has wrong number of dimensions: should be 3 or 4.")
 
         if labels is not None:
             labels = labels.squeeze(1).cpu().numpy()

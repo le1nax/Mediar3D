@@ -88,15 +88,17 @@ class CustomLoadImaged(LoadImaged):
 
             # If it's a path (string/Path), then load
             if isinstance(val, (str, Path)):
-                try:
-                    loaded = self._loader(val)
-                    if self._loader.image_only and isinstance(loaded, dict):
-                        loaded = loaded["image"]
-                    data[key] = loaded
-                except Exception as e:
-                    if self.allow_missing_keys:
-                        continue
-                    raise e
+                # try:
+                loaded = self._loader(val)
+                if self._loader.image_only and isinstance(loaded, dict):
+                    loaded = loaded["image"]
+
+                data["name"] = val
+                data[key] = loaded
+                # except Exception as e:
+                #     if self.allow_missing_keys:
+                #         continue
+                #     raise e
 
         return data
     
@@ -153,6 +155,7 @@ class UnifiedITKReader(NumpyReader):
                 "spatial_shape": _obj.shape,  # shape before EnsureChannelFirst
                 "filename_or_obj": name,
             }
+            
             if len(_obj.shape) == 2:
                 meta["dimensionality"] = 2
                 _obj = np.repeat(np.expand_dims(_obj, axis=-1), 3, axis=-1) # (H, W, 3)
@@ -187,6 +190,7 @@ class UnifiedITKReader(NumpyReader):
                             meta["dimensionality"] = 3
                             _obj = self.move_channel_last(p, _obj)
             img_.append(_obj)
+
 
         return img_ if len(filenames) > 1 else img_[0]
 

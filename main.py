@@ -5,7 +5,7 @@ import argparse, pprint
 from datetime import datetime
 
 import os
-os.environ["WANDB_MODE"] = "disabled"
+#os.environ["WANDB_MODE"] = "disabled"
 
 
 from train_tools import *
@@ -93,14 +93,14 @@ def main(args):
     # trainer.train()
     trainer.train()
 
-    save_dir = "../../W_B/MEDIAR_FT"
+    save_dir = "../../W_B/MEDIAR_PT"
     os.makedirs(save_dir, exist_ok=True)  # make sure it exists
 
     # Current time string: e.g. '2025-07-11_18-25-42'
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     # Save path
-    model_path = os.path.join(save_dir, f"model_{current_time}.pth")
+    model_path = os.path.join(save_dir, f"pretrained_0val_{current_time}.pth")
     print(f"Saving model to: {model_path}")
     try:
         os.makedirs(save_dir, exist_ok=True)  # ensure directory exists
@@ -133,8 +133,8 @@ def main(args):
 
 # Parser arguments for terminal execution
 parser = argparse.ArgumentParser(description="Config file processing")
-#parser.add_argument("--config_path", default="./config/step1_pretraining/phase1.json", type=str)
-parser.add_argument("--config_path", default="./config/step2_finetuning/finetuning1.json", type=str)
+parser.add_argument("--config_path", default="./config/step1_pretraining/phase1.json", type=str)
+#parser.add_argument("--config_path", default="./config/step2_finetuning/finetuning1.json", type=str)
 
 args = parser.parse_args()
 

@@ -26,7 +26,7 @@
             "name": "mediar",
             "params": {            
                 "num_epochs": 80,
-                "valid_frequency": 9999999,
+                "valid_frequency": 99999,
                 "device": "cuda:0",
                 "amp": true,
                 "algo_params": {"with_public": false}

@@ -341,7 +341,7 @@ def get_dataloaders_labeled(
 
     # Set dataloader for Trainset
     train_loader = DataLoader(
-        trainset, batch_size=batch_size, shuffle=True, num_workers=5
+        trainset, batch_size=batch_size, shuffle=True, num_workers=2
     )
 
     # Set dataloader for Validset 
