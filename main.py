@@ -6,7 +6,7 @@ from datetime import datetime
 import torch.distributed as dist
 
 import os
-os.environ["WANDB_MODE"] = "disabled"
+#os.environ["WANDB_MODE"] = "disabled"
 
 
 from train_tools import *
@@ -59,6 +59,7 @@ def _get_setups(args, device, distributed=False, rank=0, world_size=1):
 
     if args.data_setups.labeled.valid_portion == 0:
         trainer.no_valid = True
+
 
     return trainer
 
@@ -121,7 +122,7 @@ def main(args):
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     # Save path
-    model_path = os.path.join(save_dir, f"model_{current_time}.pth")
+    model_path = os.path.join(save_dir, f"pretrained_mediar_00val_3gpus_5bs_{current_time}.pth")
     print(f"Saving model to: {model_path}")
     try:
         os.makedirs(save_dir, exist_ok=True)  # ensure directory exists

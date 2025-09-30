@@ -3,7 +3,7 @@ import numpy as np
 import tifffile as tiff
 
 # --- USER: set your folder path ---
-folder = "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/cellpose_pretraining_data/IHC_TMA_dataset/masks"
+folder = "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/BlastoSPIM2_test_lowSNR/Blast_035/masks"
 
 for fname in os.listdir(folder):
     if fname.endswith(".npy"):

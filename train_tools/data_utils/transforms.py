@@ -3,6 +3,11 @@ from .custom import *
 from monai.transforms import *
 from pathlib import Path
 
+import sys
+import gc
+import psutil
+import tracemalloc
+
 __all__ = [
     "train_transforms",
     "public_transforms",
@@ -10,6 +15,61 @@ __all__ = [
     "tuning_transforms",
     "unlabeled_transforms",
 ]
+
+def log_mem(tag):
+    process = psutil.Process()
+    mem = process.memory_info().rss / 1e9
+    current, peak = tracemalloc.get_traced_memory()
+    print(f"[{tag}] RAM: {mem:.2f} GB | Python objs: {current/1e6:.1f} MB (peak {peak/1e6:.1f} MB)")
+    gc.collect()
+
+class DebugCompose:
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, data):
+        for t in self.transforms:
+            data = t(data)
+            log_mem(t.__class__.__name__)
+        return data
+
+# replace Compose with DebugCompose
+debug_train_transforms = DebugCompose(
+[
+        CustomLoadImaged(keys=["img", "label", "cellcenter"], image_only=True, allow_missing_keys=True),
+        CustomNormalizeImaged(
+            keys=["img"],
+            allow_missing_keys=True,
+            channel_wise=False,
+            percentiles=[0.0, 99.5],
+        ),
+        EnsureChannelFirstd(keys=["img", "label", "cellcenter", "flow"], channel_dim=-1, allow_missing_keys=True),
+        RemoveRepeatedChanneld(keys=["label"], repeats=3),
+        ScaleIntensityd(keys=["img"], allow_missing_keys=True),
+
+        RandZoomd(
+            keys=["img", "label", "cellcenter", "flow"],
+            prob=0.5,
+            min_zoom=0.25,
+            max_zoom=1.5,
+            mode=["area", "nearest", "nearest", "area"],
+            keep_size=False,
+            allow_missing_keys=True,
+        ),
+        SpatialPadd(keys=["img", "label", "cellcenter", "flow"], spatial_size=512, allow_missing_keys=True),
+        RandSpatialCropd(keys=["img", "label", "cellcenter", "flow"], roi_size=512, random_size=False, allow_missing_keys=True),
+        RandAxisFlipd(keys=["img", "label", "cellcenter", "flow"], prob=0.5, allow_missing_keys=True),
+        RandRotate90d(keys=["img", "label", "cellcenter", "flow"], prob=0.5, spatial_axes=[0, 1], allow_missing_keys=True),
+
+        IntensityDiversification(keys=["img", "label"], allow_missing_keys=True),
+        RandGaussianNoised(keys=["img"], prob=0.25, mean=0, std=0.1),
+        RandAdjustContrastd(keys=["img"], prob=0.25, gamma=(1, 2)),
+        RandGaussianSmoothd(keys=["img"], prob=0.25, sigma_x=(1, 2)),
+        RandHistogramShiftd(keys=["img"], prob=0.25, num_control_points=3),
+        RandGaussianSharpend(keys=["img"], prob=0.25),
+       # EnsureTyped(keys=["img", "label", "cellcenter", "flow"], allow_missing_keys=True),
+    ]
+)
 
 train_transforms = Compose(
     [
@@ -44,7 +104,7 @@ train_transforms = Compose(
         RandGaussianSmoothd(keys=["img"], prob=0.25, sigma_x=(1, 2)),
         RandHistogramShiftd(keys=["img"], prob=0.25, num_control_points=3),
         RandGaussianSharpend(keys=["img"], prob=0.25),
-        EnsureTyped(keys=["img", "label", "cellcenter", "flow"], allow_missing_keys=True),
+       EnsureTyped(keys=["img", "label", "cellcenter", "flow"], allow_missing_keys=True),
     ]
 )
 

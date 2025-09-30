@@ -1,6 +1,7 @@
 import torch
 import wandb
 import pprint
+import torch.distributed as dist
 
 __all__ = ["print_learning_device", "print_with_logging"]
 
@@ -27,3 +28,8 @@ def print_with_logging(results, step):
 
     # Log on the w&b server
     wandb.log(results, step=step)
+
+def log_device(message):
+    """Log a message only from the main process in a distributed setting."""
+    if not dist.is_initialized() or dist.get_rank() == 0:
+            print(message)

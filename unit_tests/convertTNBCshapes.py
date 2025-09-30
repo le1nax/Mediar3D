@@ -28,4 +28,4 @@ def get_image_shapes(directory):
 
 
 
-get_image_shapes("/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/cellpose_pretraining_data/TNBC_img")
+get_image_shapes("/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/cellpose_pretraining_data/nuinsseg_img")
