@@ -508,6 +508,7 @@ class Predictor(BasePredictor):
         #     pred_mask[2] = (outputs_base[2] + outputs_hflip[2] + outputs_vflip[2]) / 3
 
         # return pred_mask
+    
 
     def _post_process3D(self, pred_mask, cellcenters=None): ## @todo
 

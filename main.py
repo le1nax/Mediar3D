@@ -8,6 +8,10 @@ import torch.distributed as dist
 import os
 #os.environ["WANDB_MODE"] = "disabled"
 
+def log_device(*args, **kwargs):
+    """Drop-in replacement for print, only prints from rank 0 (or non-distributed)."""
+    if not dist.is_initialized() or dist.get_rank() == 0:
+        print(*args, **kwargs)
 
 from train_tools import *
 from SetupDict import TRAINER, OPTIMIZER, SCHEDULER, MODELS, PREDICTOR
@@ -27,7 +31,7 @@ def _get_setups(args, device, distributed=False, rank=0, world_size=1):
 
     if model_args.pretrained.enabled:
         weights = torch.load(model_args.pretrained.weights, map_location="cpu")
-        print("\nLoading pretrained model....")
+        log_device("\nLoading pretrained model....")
         model.load_state_dict(weights, strict=model_args.pretrained.strict)
 
     dataloaders = get_dataloaders_labeled(
@@ -66,7 +70,7 @@ def _get_setups(args, device, distributed=False, rank=0, world_size=1):
 
 def main(args):
     """Execute experiment."""
-    print(os.getcwd())
+    log_device(os.getcwd())
 
     # --- DDP setup ---
     if torch.cuda.device_count() > 1:
@@ -80,7 +84,7 @@ def main(args):
         world_size = 1
         distributed = False
 
-    print("LOCAL_RANK:", os.environ.get("LOCAL_RANK"))
+    log_device("LOCAL_RANK:", os.environ.get("LOCAL_RANK"))
 
 
     # Initialize W&B
@@ -123,20 +127,20 @@ def main(args):
 
     # Save path
     model_path = os.path.join(save_dir, f"pretrained_mediar_00val_3gpus_5bs_{current_time}.pth")
-    print(f"Saving model to: {model_path}")
+    log_device(f"Saving model to: {model_path}")
     try:
         os.makedirs(save_dir, exist_ok=True)  # ensure directory exists
         torch.save(trainer.model.state_dict(), model_path)
-        print(f"Model successfully saved to {model_path}")
+        log_device(f"Model successfully saved to {model_path}")
 
     except FileNotFoundError as e:
-        print(f"FileNotFoundError: {e}")
+        log_device(f"FileNotFoundError: {e}")
 
     except PermissionError as e:
-        print(f"PermissionError: {e}")
+        log_device(f"PermissionError: {e}")
 
     except Exception as e:
-        print(f"Unexpected error while saving model: {e}")
+        log_device(f"Unexpected error while saving model: {e}")
 
     # # Conduct prediction using the trained model
     # predictor = PREDICTOR[args.train_setups.trainer.name](

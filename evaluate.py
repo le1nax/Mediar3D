@@ -70,7 +70,7 @@ def main(args):
     print("mean F1 Score:", np.mean(cellseg_metric["F1_Score"]))
         
 
-    show_QC_results(img_path, pred_path, gt_path, cellseg_metric)
+    show_QC_Pred_GT_overlay(img_path, pred_path, gt_path)
 
     # Save results
     # if args.eval_setups.save_path is not None:
@@ -78,7 +78,124 @@ def main(args):
     #     cellseg_metric.to_csv(
     #         os.path.join(args.eval_setups.save_path, "seg_metric.csv"), index=False
     #     )
+def show_QC_Pred_GT_overlay(img_path, pred_path, gt_path=None):
+    """
+    Show overlays:
+    - Source + Prediction
+    - Ground Truth + Prediction (if gt_path is provided)
+    """
 
+    # --- Collect files ---
+    source_files = sorted([f for f in os.listdir(img_path) if f.endswith(('.tiff', '.tif'))])
+    prediction_files = sorted([f for f in os.listdir(pred_path) if f.endswith(('.tiff', '.tif'))])
+    target_files = sorted([f for f in os.listdir(gt_path) if f.endswith(('.tiff', '.tif'))]) if gt_path else None
+
+    if gt_path and (len(source_files) != len(target_files) or len(source_files) != len(prediction_files)):
+        raise ValueError("The number of source, prediction, and target files must match.")
+    elif not gt_path and len(source_files) != len(prediction_files):
+        raise ValueError("The number of source and prediction files must match.")
+
+    images_list = []
+    skipped = 0
+
+    for i, (src_file, pred_file) in enumerate(zip(source_files, prediction_files)):
+        src_image = io.imread(os.path.join(img_path, src_file))
+        pred_image = io.imread(os.path.join(pred_path, pred_file))
+        gt_image = io.imread(os.path.join(gt_path, target_files[i])) if gt_path else None
+
+        if src_image.shape != pred_image.shape or (gt_image is not None and src_image.shape != gt_image.shape):
+            print(f"[Skipped] Shape mismatch at index {i}")
+            skipped += 1
+            continue
+
+        images_list.append((src_image, pred_image, gt_image))
+
+    if not images_list:
+        raise RuntimeError("No images with matching shapes were found. Cannot continue.")
+
+    if skipped > 0:
+        print(f"⚠️ Skipped {skipped} image triplets due to shape mismatches.")
+
+    # --- Stack images ---
+    source_images = np.stack([item[0] for item in images_list])
+    predicted_images = np.stack([item[1] for item in images_list])
+    ground_truth_images = np.stack([item[2] for item in images_list]) if gt_path else None
+
+    num_images = source_images.shape[0]
+    Image_Z = source_images.shape[1]
+
+    # --- Pick middle slice for normalization ---
+    middle_slice = Image_Z // 2
+    norm = mcolors.Normalize(
+        vmin=np.percentile(source_images[0, middle_slice], 1),
+        vmax=np.percentile(source_images[0, middle_slice], 99)
+    )
+    mask_norm = mcolors.Normalize(vmin=0, vmax=1)
+
+    # --- Initial state ---
+    slice_idx = middle_slice
+    image_idx = 0
+    state = {'image_idx': image_idx, 'slice_idx': slice_idx}
+
+    # --- Figure setup ---
+    ncols = 2 if gt_path else 1
+    fig, axes = plt.subplots(1, ncols, figsize=(10 * ncols, 8))
+
+    if ncols == 1:
+        axes = [axes]  # make it iterable
+
+    # Source + Prediction
+    im_overlay_input = axes[0].imshow(source_images[image_idx, slice_idx], norm=norm, cmap='magma')
+    im_overlay_pred_input = axes[0].imshow(predicted_images[image_idx, slice_idx], norm=mask_norm, alpha=0.5, cmap='Blues')
+    axes[0].set_title(f"Overlay: Source + Prediction")
+
+    # Ground Truth + Prediction
+    if gt_path:
+        im_overlay_gt = axes[1].imshow(ground_truth_images[image_idx, slice_idx], cmap='Greens', norm=mask_norm)
+        im_overlay_pred_gt = axes[1].imshow(predicted_images[image_idx, slice_idx], norm=mask_norm, alpha=0.5, cmap='Blues')
+        axes[1].set_title("Overlay: Ground Truth + Prediction")
+
+    for ax in axes:
+        ax.axis("off")
+
+    # --- Slice slider ---
+    ax_slider = plt.axes([0.2, 0.02, 0.6, 0.02])
+    slider = Slider(ax_slider, "Slice", 0, Image_Z - 1, valinit=slice_idx, valstep=1)
+
+    def update(val):
+        state['slice_idx'] = int(slider.val)
+        z = state['slice_idx']
+        i = state['image_idx']
+
+        im_overlay_input.set_data(source_images[i, z])
+        im_overlay_pred_input.set_data(predicted_images[i, z])
+
+        if gt_path:
+            im_overlay_gt.set_data(ground_truth_images[i, z])
+            im_overlay_pred_gt.set_data(predicted_images[i, z])
+
+        fig.canvas.draw_idle()
+
+    slider.on_changed(update)
+
+    # --- Image index textbox ---
+    ax_image_textbox = plt.axes([0.4, 0.07, 0.15, 0.05])
+    text_box_image = TextBox(ax_image_textbox, "Image Index:", initial="0")
+
+    def on_text_submit(text):
+        try:
+            i = int(text)
+            if i < 0 or i >= num_images:
+                print(f"Invalid image index: {i}. Please enter a value between 0 and {num_images - 1}.")
+                return
+            state['image_idx'] = i
+            update(slider.val)
+        except ValueError:
+            print("Please enter a valid integer.")
+
+    text_box_image.on_submit(lambda text: on_text_submit(text))
+
+    plt.show()
 
 def show_QC_results(img_path, pred_path, gt_path, cellseg_metric):
     print("now comes the plot")

@@ -1,9 +1,9 @@
 {
     "eval_setups":{
-        "img_path": "../../Datasets/CTC/Fluo-N3DL-DRO/02_test",
-        "gt_path": "",
-        "pred_path": "../../Datasets/CTC/Fluo-N3DL-DRO/02_res_mediar_80ep_instanceCrop",
+        "img_path": "../../Datasets/Blasto/Blast_035/cropped/img",
+        "gt_path": "../../Datasets/Blasto/Blast_035/cropped/masks",
+        "pred_path": "../../Datasets/Blasto/Blast_035/cropped/res_mediar_paperweights_zs",
         "save_path": "../../Datasets/CTC/sim3d/eval_res",
-        "only_pred_overlay": true
+        "only_pred_overlay": false
     }
 }

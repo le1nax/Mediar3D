@@ -633,6 +633,7 @@ def fill_holes_and_remove_small_masks(pred_mask):
     pred_mask = morphology.remove_small_objects(pred_mask, 16)
     pred_mask = measure.label(pred_mask)
     return pred_mask
+
     
 def get_masks_torch(pt, inds, shape0, rpad=20, max_size_fraction=0.4):
     """Create masks using pixel convergence after running dynamics.

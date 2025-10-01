@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "../../")))
 
 from core.BaseTrainer import BaseTrainer
 from core.MEDIAR.utils import *
+from core.utils import log_device
 from monai.losses import DiceLoss
 
 import tifffile as tiff
@@ -223,16 +224,16 @@ def compare_flows(flow_pred, flow_loaded, atol=1e-5, rtol=1e-3):
     flow_pred = flow_pred.to(flow_loaded.device)
 
     if flow_pred.shape != flow_loaded.shape:
-        print(f"Shape mismatch: predicted {flow_pred.shape}, loaded {flow_loaded.shape}")
+        log_device(f"Shape mismatch: predicted {flow_pred.shape}, loaded {flow_loaded.shape}")
         return False
 
     equal = torch.allclose(flow_pred, flow_loaded, atol=atol, rtol=rtol)
 
     if not equal:
         diff = (flow_pred - flow_loaded).abs()
-        print(f"Flow mismatch! Max diff: {diff.max().item():.6f}, Mean diff: {diff.mean().item():.6f}")
+        log_device(f"Flow mismatch! Max diff: {diff.max().item():.6f}, Mean diff: {diff.mean().item():.6f}")
     else:
-        print("Flows match.")
+        log_device("Flows match.")
     
     return equal
 
@@ -577,9 +578,9 @@ class Trainer(BaseTrainer):
                     if flows is not None:
                         cropped_flows.append(flows[b])
 
-                #print(cropped_img.shape)
+                #log_device(cropped_img.shape)
                 #if(cropped_img.shape[1] >1900 or cropped_img.shape[2]>1900):
-                #    print(f"Warning: image {b} still very large after removing zero padding: {cropped_img.shape}")
+                #    log_device(f"Warning: image {b} still very large after removing zero padding: {cropped_img.shape}")
 
                 continue
 
@@ -607,9 +608,9 @@ class Trainer(BaseTrainer):
             x_end   = min(x_max + buffer, W)
 
             #if( y_end - y_start >1900 or x_end - x_start>1900):
-             #   print(f"Warning: image {b} still very large after ROI crop: {y_end - y_start} x {x_end - x_start}")
+             #   log_device(f"Warning: image {b} still very large after ROI crop: {y_end - y_start} x {x_end - x_start}")
             #plot_image(images[b, :, y_start:y_end, x_start:x_end].cpu().numpy())
-            #print(images[b, :, y_start:y_end, x_start:x_end].shape)
+            #log_device(images[b, :, y_start:y_end, x_start:x_end].shape)
             cropped_images.append(images[b, :, y_start:y_end, x_start:x_end])
             cropped_labels.append(labels[b, :, y_start:y_end, x_start:x_end])
             if center_masks is not None:
@@ -769,7 +770,7 @@ class Trainer(BaseTrainer):
                     #     outputs_postprocessed, labels = self._post_process(outputs.detach(), center_masks, labels)
                     #     for b in range(self.current_bsize):
                     #         iou_score, f1_score = self._get_metrics(outputs_postprocessed[b], labels[b])
-                    #         print(f"  [Train QC]  F1: {f1_score:.3f}, IoU: {iou_score:.3f}")
+                    #         log_device(f"  [Train QC]  F1: {f1_score:.3f}, IoU: {iou_score:.3f}")
 
                     #         plotting_image = images[b, 0].cpu().numpy()
                     #         plotting_pred = outputs[b]

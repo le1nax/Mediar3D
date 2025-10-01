@@ -11,7 +11,7 @@ def print_learning_device(device):
         device_idx = int(device.split(":")[1])
     except Exception:
         device_idx = "N/A"
-    print(f"Training on device {device} (GPU index {device_idx})")
+    log_device(f"Training on device {device} (GPU index {device_idx})")
 
 
 def print_with_logging(results, step):

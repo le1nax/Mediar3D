@@ -1,9 +1,9 @@
 {
     "pred_setups":{
         "name": "mediar",
-        "input_path": "../../Datasets/Blasto/Blast_035/images",
+        "input_path": "../../Datasets/Blasto/Blast_035/cropped/img",
         "cellcenters_path": "",
-        "output_path": "../../Datasets/Blasto/Blast_035/res_mediar_paperweights_zs",
+        "output_path": "../../Datasets/Blasto/Blast_035/cropped/res_mediar_paperweights_zs",
         "make_submission": false,
         "model_path": "../../W_B/MEDIAR_PT/from_phase1.pth",
         "device": "cuda:0",
