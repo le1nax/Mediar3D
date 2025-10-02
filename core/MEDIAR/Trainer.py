@@ -40,7 +40,7 @@ def pad_to_multiple(tensor, multiple=32):
 
     return nn.functional.pad(tensor, (pad_left, pad_right, pad_top, pad_bottom), mode="constant", value=0)
 
-def plot_image(image, title='Image', slice_idx=None, cmap='hsv'):
+def plot_image(image, title='Image', slice_idx=None, cmap='gray'):
     """
     Plot a 2D image or a slice from a 3D image.
 
@@ -727,8 +727,8 @@ class Trainer(BaseTrainer):
                 images = torch.cat([images, images_pub], dim=0)
                 labels = torch.cat([labels, labels_pub], dim=0)
 
-            #plot_image(images[0].cpu().numpy())
-            #plot_image(labels[0].cpu().numpy())
+            plot_image(images[0].cpu().numpy())
+            plot_image(labels[0].cpu().numpy())
             if self.incomplete_annotations:
                 images, labels, flows = self._crop_to_single_instance(images, labels, flows)
             #plot_image(images[0].cpu().numpy())

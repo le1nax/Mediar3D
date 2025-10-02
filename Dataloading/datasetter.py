@@ -5,6 +5,11 @@ from pathlib import Path
 import pickle
 import numpy as np
 
+
+from torch.utils.data import WeightedRandomSampler, DistributedSampler
+from collections import defaultdict
+import json
+
 from train_tools.data_utils.transforms import (
     train_transforms,
     masked_train_transforms,
@@ -251,6 +256,117 @@ def collate_crop(batch):
         out["cellcenter"] = centers_tensor  # optionally pad/stack if needed
 
     return out
+
+
+
+# ---------------------------
+# Grouping helpers
+# ---------------------------
+def load_and_group_by_dataset(data_dicts):
+    grouped = defaultdict(list)
+    for sample in data_dicts:
+        dataset_name = sample["img"].split("/")[-2]
+        grouped[dataset_name].append(sample)
+    return grouped
+
+
+def make_weighted_sampler(dataset, grouped, custom_ratios):
+    total_ratio = sum(custom_ratios.values())
+    ratios = {k: v / total_ratio for k, v in custom_ratios.items()}
+    dataset_sizes = {k: len(v) for k, v in grouped.items()}
+
+    weights = torch.zeros(len(dataset))
+    for idx, sample in enumerate(dataset.data):
+        dataset_name = sample["img"].split("/")[-2]
+        weights[idx] = ratios[dataset_name] / dataset_sizes[dataset_name]
+
+    return WeightedRandomSampler(weights, num_samples=len(dataset), replacement=True)
+
+
+# ---------------------------
+# Integrated get_dataloaders_labeled
+# ---------------------------
+def get_dataloaders_labeled_sampled(
+    root,
+    mapping_file,
+    tuning_mapping_file,
+    join_mapping_file=None,
+    valid_portion=0.0,
+    batch_size=8,
+    sampling_ratios=None,      # <-- now a dict (dataset_name: ratio)
+    relabel=False,
+    precompute_flows=False,
+    incomplete_annotations=False,
+    distributed=False,
+    rank=0,
+    world_size=1,
+):
+    # --- Load mapping files ---
+    data_dicts = path_decoder(root, mapping_file)
+    data_dicts = add_flows(data_dicts, device="cuda", overwrite=False, precompute_flows=precompute_flows)
+    tuning_dicts = path_decoder(root, tuning_mapping_file, no_label=True)
+
+    if incomplete_annotations:
+        data_transforms = masked_train_transforms
+    else:
+        data_transforms = train_transforms
+
+    if join_mapping_file is not None:
+        data_dicts += path_decoder(root, join_mapping_file)
+        data_transforms = public_transforms
+
+    # --- Split train/valid ---
+    train_dicts, valid_dicts = split_train_valid(
+        data_dicts, valid_portion=valid_portion
+    )
+
+    # --- Create Datasets ---
+    trainset = CustomMediarDataset(train_dicts, transform=data_transforms)
+    validset = CustomMediarDataset(valid_dicts, transform=valid_transforms)
+    tuningset = Dataset(tuning_dicts, transform=tuning_transforms)
+
+    # --- Sampler logic ---
+    train_sampler, valid_sampler = None, None
+
+    if isinstance(sampling_ratios, dict) and len(sampling_ratios) > 0:
+        grouped = load_and_group_by_dataset(train_dicts)
+        train_sampler = make_weighted_sampler(trainset, grouped, sampling_ratios)
+    elif distributed:  # distributed
+        train_sampler = DistributedSampler(
+            trainset, num_replicas=world_size, rank=rank, shuffle=True
+        )
+        if len(validset) > 0:
+            valid_sampler = DistributedSampler(validset, num_replicas=world_size, rank=rank, shuffle=False)
+
+    # --- DataLoaders ---
+    train_loader = DataLoader(
+        trainset,
+        batch_size=batch_size,
+        shuffle=(train_sampler is None),  # shuffle if no sampler
+        sampler=train_sampler,
+        num_workers=5,
+        pin_memory=True,
+    )
+
+    valid_loader = DataLoader(
+        validset,
+        batch_size=1,
+        shuffle=False,
+        sampler=valid_sampler,
+        num_workers=2,
+        pin_memory=True,
+    )
+
+    tuning_loader = DataLoader(
+        tuningset, batch_size=1, shuffle=False, num_workers=2, pin_memory=True
+    )
+
+    return {
+        "train": train_loader,
+        "valid": valid_loader,
+        "tuning": tuning_loader,
+    }
+
 
 
 def get_dataloaders_labeled(

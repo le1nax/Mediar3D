@@ -6,7 +6,7 @@ from datetime import datetime
 import torch.distributed as dist
 
 import os
-#os.environ["WANDB_MODE"] = "disabled"
+os.environ["WANDB_MODE"] = "disabled"
 
 def log_device(*args, **kwargs):
     """Drop-in replacement for print, only prints from rank 0 (or non-distributed)."""
@@ -15,6 +15,7 @@ def log_device(*args, **kwargs):
 
 from train_tools import *
 from SetupDict import TRAINER, OPTIMIZER, SCHEDULER, MODELS, PREDICTOR
+from Dataloading.datasetter import get_dataloaders_labeled_sampled
 
 # Ignore warnings for tiffle image reading
 import logging
@@ -24,22 +25,28 @@ logging.getLogger().setLevel(logging.ERROR)
 # Set torch base print precision
 torch.set_printoptions(6)
 
-
 def _get_setups(args, device, distributed=False, rank=0, world_size=1):
     model_args = args.train_setups.model
     model = MODELS[model_args.name](**model_args.params).to(device)
 
     if model_args.pretrained.enabled:
         weights = torch.load(model_args.pretrained.weights, map_location="cpu")
-        log_device("\nLoading pretrained model....")
+        print("\nLoading pretrained model....")
         model.load_state_dict(weights, strict=model_args.pretrained.strict)
-
-    dataloaders = get_dataloaders_labeled(
-        **args.data_setups.labeled,
+    if args.data_setups.labeled.sampling_ratios:
+        dataloaders = get_dataloaders_labeled_sampled(
+            **args.data_setups.labeled,
         distributed=distributed,
         rank=rank,
         world_size=world_size,
-    )
+        )
+    else:
+        dataloaders = get_dataloaders_labeled(
+            **args.data_setups.labeled,
+            distributed=distributed,
+            rank=rank,
+            world_size=world_size,
+        )
 
     optimizer_args = args.train_setups.optimizer
     optimizer = OPTIMIZER[optimizer_args.name](
