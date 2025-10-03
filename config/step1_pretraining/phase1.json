@@ -29,7 +29,7 @@
                 "panNuke2_img": 0.01,
                 "panNuke_img": 0.01,
                 "tissuenet_test_img": 0.01,
-                "tissuenet_train_img": 0.77,
+                "tissuenet_train_img": 0.01,
                 "tissuenet_val_img": 0.01,
                 "yeast_BF_img": 0.01,
                 "yeast_PhC_img": 0.01
