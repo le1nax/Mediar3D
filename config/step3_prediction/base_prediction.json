@@ -3,9 +3,9 @@
         "name": "mediar",
         "input_path": "../../Datasets/Blasto/Blast_035/cropped/img",
         "cellcenters_path": "",
-        "output_path": "../../Datasets/Blasto/Blast_035/cropped/res_mediar_paperweights_zs",
+        "output_path": "../../Datasets/Blasto/Blast_035/cropped/res_mediar_hpc_zs",
         "make_submission": false,
-        "model_path": "../../W_B/MEDIAR_PT/from_phase1.pth",
+        "model_path": "../../W_B/MEDIAR_PT_hpc/pretrained_mediar_01val_4gpus_16bs_2025-10-06_13-23-20_unwrapped.pth",
         "device": "cuda:0",
         "model":{
             "name": "mediar-former",

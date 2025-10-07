@@ -70,7 +70,7 @@ def main(args):
     print("mean F1 Score:", np.mean(cellseg_metric["F1_Score"]))
         
 
-    show_QC_Pred_GT_overlay(img_path, pred_path, gt_path)
+    show_QC_results(img_path, pred_path, gt_path, cellseg_metric)
 
     # Save results
     # if args.eval_setups.save_path is not None:

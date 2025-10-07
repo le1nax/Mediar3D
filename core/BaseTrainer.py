@@ -193,6 +193,7 @@ class BaseTrainer:
             if not dist.is_initialized() or dist.get_rank() == 0:
                 log_device(">>> Train Epoch")
             train_results = self._epoch_phase("train")
+            
             print_with_logging(train_results, epoch)
             
             train_loss = train_results.get("Train_Dice_Loss", None)

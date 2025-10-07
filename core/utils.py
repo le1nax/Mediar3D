@@ -21,13 +21,14 @@ def print_with_logging(results, step):
         results (dict): results dictionary
         step (int): epoch index
     """
-    # Print the results dictionary
-    pp = pprint.PrettyPrinter(compact=True)
-    pp.pprint(results)
-    print()
+    if not dist.is_initialized() or dist.get_rank() == 0:
+        # Print the results dictionary
+        pp = pprint.PrettyPrinter(compact=True)
+        pp.pprint(results)
+        print()
 
-    # Log on the w&b server
-    wandb.log(results, step=step)
+        # Log on the w&b server
+        wandb.log(results, step=step)
 
 def log_device(message):
     """Log a message only from the main process in a distributed setting."""

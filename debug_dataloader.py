@@ -17,33 +17,33 @@ from train_tools.data_utils.transforms import train_transforms, valid_transforms
 
 # --- User-defined sampling ratios per dataset ---
 
-custom_ratios  = {
-                "01": 0.01,
-                "01_tiff": 0.01,
-                "BCCD_train_img": 0.01,
-                "CoNIC_img": 0.01,
-                "DeepBacs_test_img": 0.01,
-                "DeepBacs_train_img": 0.01,
-                "IHC_TMA_img": 0.01,
-                "TNBC_img": 0.01,
-                "cellpose_img": 0.01,
-                "cellpose_test_img": 0.01,
-                "cpm15_img": 0.01,
-                "cpm17_test_img": 0.01,
-                "cpm17_train_img": 0.01,
-                "cyto2_img": 0.01,
-                "lynsec_img": 0.01,
-                "neurips_img": 0.01,
-                "nuinsseg_img": 0.01,
-                "panNuke2_img": 0.01,
-                "panNuke_img": 0.01,
-                "tissuenet_test_img": 0.01,
-                "tissuenet_train_img": 0.01,
-                "tissuenet_val_img": 0.01,
-                "yeast_BF_img": 0.01,
-                "yeast_PhC_img": 0.01
-            }
-
+sampling_ratios ={
+    "01":0.05,
+    "01_tiff":0.20,
+    "BCCD_test_img":0.01,
+    "BCCD_train_img":0.01, 
+    "CoNIC_img":0.01,
+    "DeepBacs_test_img":0.01,
+    "DeepBacs_train_img":0.01,
+    "IHC_TMA_img":0.01,
+    "TNBC_img":0.01,
+    "cellpose_img":0.14,
+    "cellpose_test_img":0.15,
+    "cpm15_img":0.01,
+    "cpm17_test_img":0.01,
+    "cpm17_train_img":0.01,
+    "cyto2_img":0.20,
+    "lynsec_img":0.01,
+    "neurips_img":0.01,
+    "nuinsseg_img":0.01,
+    "panNuke2_img":0.01,
+    "panNuke_img":0.01,
+    "tissuenet_test_img":0.03,
+    "tissuenet_train_img":0.03,
+    "tissuenet_val_img":0.02,
+    "yeast_BF_img":0.02,
+    "yeast_PhC_img":0.01
+}
 
 # ---------------------------
 # Dataset
@@ -121,9 +121,9 @@ def load_and_group_by_dataset(json_file):
 # ---------------------------
 # Custom weighted dataloader
 # ---------------------------
-def make_custom_dataloader(dataset, grouped, custom_ratios, batch_size=4):
-    total_ratio = sum(custom_ratios.values())
-    ratios = {k: v / total_ratio for k, v in custom_ratios.items()}
+def make_custom_dataloader(dataset, grouped, sampling_ratios, batch_size=4):
+    total_ratio = sum(sampling_ratios.values())
+    ratios = {k: v / total_ratio for k, v in sampling_ratios.items()}
 
     dataset_sizes = {k: len(v) for k, v in grouped.items()}
 
@@ -166,7 +166,7 @@ all_data = sum(grouped.values(), [])
 trainset = CustomMediarDataset(all_data, transform=train_transforms)
 
 # 4. Create weighted dataloader
-train_loader = make_custom_dataloader(trainset, grouped, custom_ratios, batch_size=1)
+train_loader = make_custom_dataloader(trainset, grouped, sampling_ratios, batch_size=1)
 
 
 # 5. Visualize sampled images
@@ -175,33 +175,33 @@ max_images = 20
 count = 0
 
 
-for batch_idx, batch in enumerate(train_loader):
-    images = batch['img']  # assuming shape [B, C, H, W]
-    
-    for i in range(len(images)):
-        if count >= max_images:
-            break
-        
-        show_image(images[i], title=f"Batch {batch_idx}, Sample {i}")
-        count += 1
-    
-    if count >= max_images:
-        break
-    
-    del batch
-
-
-
-# import gc, tracemalloc, psutil
 # for batch_idx, batch in enumerate(train_loader):
-#     images = batch['img']
-#     if batch_idx % 100 == 0:
-#         mem = psutil.virtual_memory()
-#         current, peak = tracemalloc.get_traced_memory()
-#         print(f"[Iter {batch_idx}] CPU: {mem.used/1e9:.2f} GB | Python objects: {current/1e6:.1f} MB (peak {peak/1e6:.1f} MB)")
+#     images = batch['img']  # assuming shape [B, C, H, W]
     
-#     gc.collect()
+#     for i in range(len(images)):
+#         if count >= max_images:
+#             break
+        
+#         show_image(images[i], title=f"Batch {batch_idx}, Sample {i}")
+#         count += 1
+    
+#     if count >= max_images:
+#         break
+    
 #     del batch
+
+
+
+import gc, tracemalloc, psutil
+for batch_idx, batch in enumerate(train_loader):
+    images = batch['img']
+    if batch_idx % 100 == 0:
+        mem = psutil.virtual_memory()
+        current, peak = tracemalloc.get_traced_memory()
+        print(f"[Iter {batch_idx}] CPU: {mem.used/1e9:.2f} GB | Python objects: {current/1e6:.1f} MB (peak {peak/1e6:.1f} MB)")
+    
+    gc.collect()
+    del batch
 
 
 

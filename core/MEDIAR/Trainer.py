@@ -696,7 +696,11 @@ class Trainer(BaseTrainer):
             labels = batch_data["label"].to(self.device)
             flows = batch_data.get("flow", None)
             self.current_bsize = images.shape[0]
-            
+            # import gc, tracemalloc, psutil
+
+            # mem = psutil.virtual_memory()
+            # current, peak = tracemalloc.get_traced_memory()
+            # print(f"CPU: {mem.used/1e9:.2f} GB | Python objects: {current/1e6:.1f} MB (peak {peak/1e6:.1f} MB)")
             if flows is not None:
                 # If flows is a list of file paths (str), load them
                 if isinstance(flows[0], str):       
