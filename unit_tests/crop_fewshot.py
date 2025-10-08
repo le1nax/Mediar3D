@@ -6,6 +6,9 @@ import os
 from collections import OrderedDict
 from tqdm import tqdm
 
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from train_tools.utils import ConfLoader, pprint_config
 from train_tools.measures import evaluate_f1_score_cellseg, evaluate_metrics_cellseg
 
@@ -97,6 +100,7 @@ def crop_along_axis(volume, slice_obj, axis=0):
 
 def main(args):
 
+    clip = args.eval_setups.crop_to_roi
     slice_index = args.eval_setups.slice_index
     axis = args.eval_setups.axis
 
@@ -135,39 +139,33 @@ def main(args):
     buffer = 10  # pixels to extend beyond bounding box
 
     for i in tqdm(range(len(img_names))):
-        # Load images
         gt = tif.imread(os.path.join(gt_path, gt_names[i]))
         img = tif.imread(os.path.join(img_path, img_names[i]))
-        #cellcenters = tif.imread(os.path.join(cellcenters_path, cellcenter_names[i]))
 
         assert gt.shape == img.shape, f"Shape mismatch: {img.shape} vs {gt.shape}"
+        if clip:
+            nonzero = np.argwhere(gt > 0)
+            if nonzero.size == 0:
+                print(f"Warning: No label found in {gt_names[i]}")
+                continue
 
-        # Find bounding box of the label
-        nonzero = np.argwhere(gt > 0)
-        if nonzero.size == 0:
-            print(f"Warning: No label found in {gt_names[i]}")
-            continue
+            zmin, ymin, xmin = nonzero.min(axis=0)
+            zmax, ymax, xmax = nonzero.max(axis=0)
 
-        zmin, ymin, xmin = nonzero.min(axis=0)
-        zmax, ymax, xmax = nonzero.max(axis=0)
+            zmin = max(zmin - buffer, 0)
+            ymin = max(ymin - buffer, 0)
+            xmin = max(xmin - buffer, 0)
 
-        # Add buffer and clip to image bounds
-        zmin = max(zmin - buffer, 0)
-        ymin = max(ymin - buffer, 0)
-        xmin = max(xmin - buffer, 0)
+            zmax = min(zmax + buffer + 1, gt.shape[0])
+            ymax = min(ymax + buffer + 1, gt.shape[1])
+            xmax = min(xmax + buffer + 1, gt.shape[2])
 
-        zmax = min(zmax + buffer + 1, gt.shape[0])  # +1 to include the max index
-        ymax = min(ymax + buffer + 1, gt.shape[1])
-        xmax = min(xmax + buffer + 1, gt.shape[2])
+            img = img[zmin:zmax, ymin:ymax, xmin:xmax]
+            gt = gt[zmin:zmax, ymin:ymax, xmin:xmax]
 
-        # Crop image and label
-        img_crop = img[zmin:zmax, ymin:ymax, xmin:xmax]
-        gt_crop = gt[zmin:zmax, ymin:ymax, xmin:xmax]
-
-        #img_crop = crop_along_axis(img_crop, slice(0,slice_index), axis=2)
-        #gt_crop = crop_along_axis(gt_crop, slice(0,slice_index), axis=2)
-
-        save_3d_slices_in_all_directions(img_crop, gt_crop, output_img_dir, output_val_dir)
+        # Pass image name (without extension)
+        base_name = os.path.splitext(img_names[i])[0]
+        save_3d_slices_in_all_directions(img, gt, output_img_dir, output_val_dir, base_name)
 
 
         # # Save with consistent zero-padded filename
@@ -201,17 +199,10 @@ def main(args):
 
     # print(f"Saved inference volume to '{infer_img_path}' and '{infer_gt_path}'.")
 
-def save_3d_slices_in_all_directions(img_crop, gt_crop, output_img_dir, output_val_dir, starting_index=0):
+def save_3d_slices_in_all_directions(img_crop, gt_crop, output_img_dir, output_val_dir, img_name, starting_index=0):
     """
-    Slices 3D images and masks in Z, Y, and X directions, saves 2D slices with unique filenames,
-    and skips slices where the corresponding mask is completely empty.
-
-    Args:
-        img_crop (ndarray): 3D image, shape (Z, H, W)
-        gt_crop (ndarray): 3D mask, shape (Z, H, W)
-        output_img_dir (str): Path to save 2D image slices
-        output_val_dir (str): Path to save 2D mask slices
-        starting_index (int): Index to start filename numbering from
+    Slices 3D images and masks in Z, Y, and X directions, saves 2D slices with filenames
+    including the original image name and direction, and skips empty mask slices.
     """
     assert img_crop.shape == gt_crop.shape, "Image and mask must have the same shape"
     idx = starting_index
@@ -238,18 +229,18 @@ def save_3d_slices_in_all_directions(img_crop, gt_crop, output_img_dir, output_v
                 skipped += 1
                 continue
 
-            img_filename = f"cell_{idx:05d}.tiff"
-            gt_filename = f"cell_{idx:05d}_label.tiff"
+            img_filename = f"{img_name}_{directions[d]}_{idx:05d}.tiff"
+            gt_filename = f"{img_name}_{directions[d]}_{idx:05d}_label.tiff"
 
             tif.imwrite(os.path.join(output_img_dir, img_filename), img_slice_2d)
             tif.imwrite(os.path.join(output_val_dir, gt_filename), gt_slice_2d)
 
-            print(f"[{directions[d]}] Saved slice {idx:05d}")
+            print(f"[{directions[d]}] Saved slice {img_filename}")
             idx += 1
 
     total_saved = idx - starting_index
-    print(f"\nTotal saved slices: {total_saved}")
-    print(f"Total skipped slices (empty masks): {skipped}")
+    print(f"\n{img_name}: Total saved slices: {total_saved}")
+    print(f"{img_name}: Total skipped slices (empty masks): {skipped}")
 
 
 def show_QC_results(img_path, pred_path, gt_path, cellseg_metric, slice_index=25):

@@ -5,7 +5,7 @@
             "mapping_file": "./train_tools/data_utils/mapping_labeled_dic_sim.json",
             "tuning_mapping_file": "./train_tools/data_utils/mapping_tuning_dic_sim.json",
             "amplified": false,
-            "batch_size": 1, 
+            "batch_size": 5, 
             "valid_portion": 0.1,
             "precompute_flows": false,
             "incomplete_annotations": false
@@ -28,14 +28,14 @@
             "params": {},
             "pretrained":{
                 "enabled": true,
-                "weights": "../../W_B/MEDIAR_PT/from_phase1.pth",
+                "weights": "../../W_B/MEDIAR_PT/pretrained_mediar_00val_3gpus_5bs_2025-10-05_05-53-09_unwrapped.pth",
                 "strict": false
             }
         },
         "trainer": {
             "name": "mediar",
             "params": {            
-                "num_epochs": 80,
+                "num_epochs": 50,
                 "valid_frequency": 10,
                 "device": "cuda:0",
                 "amp": false,

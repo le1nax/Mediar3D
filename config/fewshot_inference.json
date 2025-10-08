@@ -1,14 +1,15 @@
 {
     "eval_setups":{
-        "img_path": "../../Datasets/CTC/sim3d/fewshot/02_img",
-        "gt_path": "../../Datasets/CTC/sim3d/fewshot/02_mask",
+        "img_path": "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/BlastoSPIM1_train/F1_095/cropped/img",
+        "gt_path": "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/BlastoSPIM1_train/F1_095/cropped/masks",
         "cellcenter_path": "",
-        "fs_train_img": "../../Datasets/CTC/sim3d/fewshot/fs_train_img",
-        "fs_train_masks": "../../Datasets/CTC/sim3d/fewshot/fs_train_masks",
+        "fs_train_img": "/work/scratch/geiger/Datasets/Blasto/train/F1_095/images",
+        "fs_train_masks": "/work/scratch/geiger/Datasets/Blasto/train/F1_095/masks",
         "fs_inference_img": "../../Datasets/CTC/sim3d/fewshot/fs_inference_img",
         "fs_inference_masks": "../../Datasets/CTC/sim3d/fewshot/fs_inference_masks",
         "fs_inference_cellcenters": "",
         "slice_index": 25,
-        "axis": 2
+        "axis": 2,
+        "crop_to_roi": false
     }
 }
