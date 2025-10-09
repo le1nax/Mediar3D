@@ -6,7 +6,7 @@ from datetime import datetime
 import torch.distributed as dist
 
 import os
-os.environ["WANDB_MODE"] = "disabled"
+#os.environ["WANDB_MODE"] = "disabled"
 
 def log_device(*args, **kwargs):
     """Drop-in replacement for print, only prints from rank 0 (or non-distributed)."""
@@ -133,7 +133,7 @@ def main(args):
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     # Save path
-    model_path = os.path.join(save_dir, f"pretrained_mediar_00val_4gpus_16bs_newdistribution_{current_time}.pth")
+    model_path = os.path.join(save_dir, f"pretrained_mediarcondor_00val_4gpus_5bs_newdistribution_{current_time}.pth")
     log_device(f"Saving model to: {model_path}")
     if not dist.is_initialized() or dist.get_rank() == 0:
         try:

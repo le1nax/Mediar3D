@@ -175,33 +175,33 @@ max_images = 20
 count = 0
 
 
-# for batch_idx, batch in enumerate(train_loader):
-#     images = batch['img']  # assuming shape [B, C, H, W]
-    
-#     for i in range(len(images)):
-#         if count >= max_images:
-#             break
-        
-#         show_image(images[i], title=f"Batch {batch_idx}, Sample {i}")
-#         count += 1
-    
-#     if count >= max_images:
-#         break
-    
-#     del batch
-
-
-
-import gc, tracemalloc, psutil
 for batch_idx, batch in enumerate(train_loader):
-    images = batch['img']
-    if batch_idx % 100 == 0:
-        mem = psutil.virtual_memory()
-        current, peak = tracemalloc.get_traced_memory()
-        print(f"[Iter {batch_idx}] CPU: {mem.used/1e9:.2f} GB | Python objects: {current/1e6:.1f} MB (peak {peak/1e6:.1f} MB)")
+    images = batch['img']  # assuming shape [B, C, H, W]
     
-    gc.collect()
+    for i in range(len(images)):
+        if count >= max_images:
+            break
+        
+        show_image(images[i], title=f"Batch {batch_idx}, Sample {i}")
+        count += 1
+    
+    if count >= max_images:
+        break
+    
     del batch
+
+
+
+# import gc, tracemalloc, psutil
+# for batch_idx, batch in enumerate(train_loader):
+#     images = batch['img']
+#     if batch_idx % 100 == 0:
+#         mem = psutil.virtual_memory()
+#         current, peak = tracemalloc.get_traced_memory()
+#         print(f"[Iter {batch_idx}] CPU: {mem.used/1e9:.2f} GB | Python objects: {current/1e6:.1f} MB (peak {peak/1e6:.1f} MB)")
+    
+#     gc.collect()
+#     del batch
 
 
 
