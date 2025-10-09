@@ -39,8 +39,13 @@
                 "valid_frequency": 10,
                 "device": "cuda:0",
                 "amp": false,
-                "algo_params": {"with_public": false}
-            }
+                        "algo_params": {
+                            "with_public": false,
+                            "save_dir": "../../W_B/MEDIAR_FT/ROI_checkpoints",
+                            "model_name": "MediarFT_condor_sim01_",
+                            "save_at_rois": [10, 100, 1000, 10000, 100000]
+                        }
+                    }
         },
         "optimizer":{
             "name": "adamw",

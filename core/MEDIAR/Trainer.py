@@ -312,6 +312,12 @@ class Trainer(BaseTrainer):
         )
         self.incomplete_annotations = incomplete_annotations
         self.current_bsize = current_bsize
+        if hasattr(self, "save_at_rois") and self.save_at_rois is not False:
+            self.next_ROI_checkpoint = self.save_at_rois[0]
+        else:
+            self.next_ROI_checkpoint = None
+        self.ROI_counter = 0
+        self.ROI_checkpoint_index = 0  
         self.mse_loss = nn.MSELoss(reduction="mean")
         self.bce_loss = nn.BCEWithLogitsLoss(reduction="mean")
 
@@ -695,6 +701,17 @@ class Trainer(BaseTrainer):
             labels = batch_data["label"].to(self.device)
             flows = batch_data.get("flow", None)
             self.current_bsize = images.shape[0]
+            if(phase == "train"):
+                    batch_instance_count = 0
+                    for b in range(self.current_bsize):
+                        # get label map for current sample
+                        lbl = labels[b]
+                        # count unique nonzero instance IDs
+                        num_instances = (torch.unique(lbl) != 0).sum().item()
+                        batch_instance_count += num_instances
+
+                    self.ROI_counter += batch_instance_count
+
             
             if flows is not None:
                 # If flows is a list of file paths (str), load them
@@ -811,6 +828,18 @@ class Trainer(BaseTrainer):
                     else:
                         loss.backward()
                         self.optimizer.step()
+
+                    ## Save model if certain ROI reached.
+                    if self.ROI_counter >= self.next_ROI_checkpoint and self.next_ROI_checkpoint is not None:
+                        save_path = os.path.join(self.save_dir, f"{self.model_name}_ROI_{self.ROI_counter}_epoch{len(self.loss_history['epoch'])}.pth")
+                        torch.save(self.model.state_dict(), save_path)
+                        print(f"  Saved intermediate model at ROI {self.ROI_counter} to {save_path}")
+                        self.ROI_checkpoint_index += 1
+                        if self.ROI_checkpoint_index < len(self.save_at_rois):
+                            self.next_ROI_checkpoint = self.save_at_rois[self.ROI_checkpoint_index]
+                        else:
+                            self.next_ROI_checkpoint = None  # or keep the last one
+    
 
         # Update metrics
         phase_results = self._update_results(
