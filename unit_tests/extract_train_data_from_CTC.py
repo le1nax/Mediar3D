@@ -23,10 +23,10 @@ def show_QC_results_overlay(src_image, gt_image):
     plt.show()
 
 # --- Configuration ---
-source_image_dir = Path("/netshares/BiomedicalImageAnalysis/Resources/CellTrackingChallenge_UlmanNMeth/2020/Fluo-N3DL-DRO/01")  # txxx.tif
-source_label_dir = Path("/netshares/BiomedicalImageAnalysis/Resources/CellTrackingChallenge_UlmanNMeth/2020/Fluo-N3DL-DRO/01_GT/SEG")  # man_seg_xxx_zzz.tif
-output_image_dir = Path("/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-DRO/01_img_train")
-output_label_dir = Path("/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-DRO/01_label_train")
+source_image_dir = Path("/netshares/BiomedicalImageAnalysis/Resources/CellTrackingChallenge_UlmanNMeth/2020/Fluo-N3DL-TRIC/01")  # txxx.tif
+source_label_dir = Path("/netshares/BiomedicalImageAnalysis/Resources/CellTrackingChallenge_UlmanNMeth/2020/Fluo-N3DL-TRIC/01_GT/SEG")  # man_seg_xxx_zzz.tif
+output_image_dir = Path("/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIC/01_train/imgs")
+output_label_dir = Path("/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-TRIC/01_train/masks")
 
 output_image_dir.mkdir(parents=True, exist_ok=True)
 output_label_dir.mkdir(parents=True, exist_ok=True)

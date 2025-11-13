@@ -1,10 +1,9 @@
 {
     "eval_setups":{
-        "img_path": "../../Datasets/Blasto/Blast_035/cropped/img",
-        "gt_path": "../../Datasets/Blasto/Blast_035/cropped/masks",
-        "pred_path": "../../Datasets/Blasto/Blast_035/cropped/res_hieraPT_condor_01cellprob_zs",
+        "img_path": "/work/scratch/geiger/Datasets/Blasto/Blast_035/cropped/img",
+        "gt_path": "/work/scratch/geiger/Datasets/Blasto/Blast_035/cropped/masks",
+        "pred_path": "/work/scratch/geiger/Datasets/Blasto/Blast_035/cropped/maskedloss_BLASTO_GRAND_FINALE/roicrop",
         "save_path": "../../Datasets/CTC/sim3d/eval_res",
         "only_pred_overlay": false
     }
 }
-

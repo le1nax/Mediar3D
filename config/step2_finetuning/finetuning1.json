@@ -5,8 +5,8 @@
             "mapping_file": "./train_tools/data_utils/mapping_labeled_dic_sim.json",
             "tuning_mapping_file": "./train_tools/data_utils/mapping_tuning_dic_sim.json",
             "amplified": false,
-            "batch_size": 5, 
-            "valid_portion": 0.1,
+            "batch_size": 4, 
+            "valid_portion": 0.0,
             "precompute_flows": false,
             "incomplete_annotations": false
         },
@@ -28,7 +28,7 @@
             "params": {},
             "pretrained":{
                 "enabled": true,
-                "weights": "../../W_B/MEDIAR_PT/pretrained_mediar_00val_3gpus_5bs_2025-10-05_05-53-09_unwrapped.pth",
+                "weights": "/work/scratch/geiger/W_B/MEDIAR_FT/final_weights/sim01_ROI_checkpoints_condor/mediar_condor_ROI_0_epoch.pth",
                 "strict": false
             }
         },
@@ -36,14 +36,15 @@
             "name": "mediar",
             "params": {            
                 "num_epochs": 50,
-                "valid_frequency": 10,
+                "valid_frequency": 9999999,
                 "device": "cuda:0",
                 "amp": false,
-                        "algo_params": {
+                "algo_params": {
                             "with_public": false,
-                            "save_dir": "../../W_B/MEDIAR_FT/ROI_checkpoints",
-                            "model_name": "MediarFT_condor_sim01_",
-                            "save_at_rois": [10, 100, 1000, 10000, 100000]
+                            "save_dir": "/work/scratch/geiger/W_B/MEDIAR_FT/final_weights/ROI_checkpoints_condor_blast",
+                            "model_name": "Condor_mediar_blast",
+                            "save_at_rois": [10,100,1000,10000,100000],
+                            "instance_cropping": false
                         }
                     }
         },

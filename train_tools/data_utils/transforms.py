@@ -122,7 +122,7 @@ masked_train_transforms = Compose(
         RandHistogramShiftd(keys=["img"], prob=0.25, num_control_points=3),
         RandGaussianSharpend(keys=["img"], prob=0.25),
         EnsureTyped(keys=["img", "label", "cellcenter", "flow"], allow_missing_keys=True),
-        SpatialPadd(keys=["img", "label", "cellcenter", "flow"], spatial_size=2000, allow_missing_keys=True)
+        SpatialPadd(keys=["img", "label", "cellcenter", "flow"], spatial_size=2016, allow_missing_keys=True)
     ]
 )
 

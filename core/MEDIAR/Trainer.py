@@ -174,6 +174,49 @@ def show_QC_results(src_image, pred_image, gt_image):
     plt.tight_layout()
     plt.show()
 
+def show_QC_results_overlay(src_image, pred_image, gt_image, save_path=None):
+    """
+    Show quality control results for a single 2D slice.
+
+    Displays:
+    1. Overlay: Source + Prediction
+    2. Overlay: Prediction + Ground Truth
+    """
+
+    # Robust normalization for the source image (ignore zeros)
+    nonzero_vals = src_image[src_image > 0]
+    if nonzero_vals.size > 0:
+        vmin = np.percentile(nonzero_vals, 1)
+        vmax = np.percentile(nonzero_vals, 99)
+    else:
+        vmin, vmax = 0, 1
+
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+    mask_norm = mcolors.Normalize(vmin=0, vmax=1)
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+    # 1️⃣ Source + Prediction
+    axes[0].imshow(src_image, norm=norm, cmap='gray', interpolation='nearest')
+    axes[0].imshow(pred_image, norm=mask_norm, alpha=0.5, cmap='Blues')
+    axes[0].set_title('Overlay: Source + Prediction')
+    axes[0].axis('off')
+
+    # 2️⃣ Prediction + Ground Truth
+    axes[1].imshow(pred_image, norm=mask_norm, alpha=0.6, cmap='Blues')
+    axes[1].imshow(gt_image, norm=mask_norm, alpha=0.4, cmap='Greens')
+    axes[1].set_title('Overlay: Prediction + Ground Truth')
+    axes[1].axis('off')
+
+    plt.tight_layout()
+
+    if save_path is not None:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Saved QC overlay to: {save_path}")
+    
+    plt.show()
+
 def remove_zero_padding_2d(tensor: torch.Tensor, threshold: float = 1e-6):
     """
     Crop a 2D (C, H, W) tensor to remove zero-padded borders.
@@ -314,6 +357,7 @@ class Trainer(BaseTrainer):
         self.current_bsize = current_bsize
         if hasattr(self, "save_at_rois") and self.save_at_rois is not False:
             self.next_ROI_checkpoint = self.save_at_rois[0]
+            os.makedirs(self.save_dir, exist_ok=True)
         else:
             self.next_ROI_checkpoint = None
         self.ROI_counter = 0
@@ -422,7 +466,7 @@ class Trainer(BaseTrainer):
 
         return cellprob_loss, 0.5* gradflow_loss
     
-    def _crop_to_single_instance(self, images, labels, flows=None, center_masks=None, buffer=3):
+    def _crop_to_single_instance(self, images, labels, flows=None, center_masks=None, buffer=4):
         """
         Crop each image in the batch to a randomly chosen single instance (connected component > 0).
         If no instance exists, fall back to zero-padding removal (same behavior as _crop_to_ROI).
@@ -693,25 +737,15 @@ class Trainer(BaseTrainer):
         # Set model mode
         self.model.train() if phase == "train" else self.model.eval()
 
-        #qc_counter = 0  # Reset at the beginning of each phase
+        qc_counter = 0  # Reset at the beginning of each phase
 
         # Epoch process
         for batch_data in tqdm(self.dataloaders[phase]):
             images = batch_data["img"].to(self.device)
             labels = batch_data["label"].to(self.device)
             flows = batch_data.get("flow", None)
+
             self.current_bsize = images.shape[0]
-            if(phase == "train"):
-                    batch_instance_count = 0
-                    for b in range(self.current_bsize):
-                        # get label map for current sample
-                        lbl = labels[b]
-                        # count unique nonzero instance IDs
-                        num_instances = (torch.unique(lbl) != 0).sum().item()
-                        batch_instance_count += num_instances
-
-                    self.ROI_counter += batch_instance_count
-
             
             if flows is not None:
                 # If flows is a list of file paths (str), load them
@@ -746,7 +780,24 @@ class Trainer(BaseTrainer):
             #plot_image(images[0].cpu().numpy())
             #plot_image(labels[0].cpu().numpy())
             if self.incomplete_annotations:
-                images, labels, flows = self._crop_to_single_instance(images, labels, flows)
+                flip = random.choice([True, False])
+
+                if(self.instance_cropping) and flip:
+                    images, labels, flows = self._crop_to_single_instance(images, labels, flows)
+                else:
+                    images, labels, flows = self._crop_to_ROI(images, labels, flows)
+
+    
+            if(phase == "train"):
+                    batch_instance_count = 0
+                    for b in range(self.current_bsize):
+                        # get label map for current sample
+                        lbl = labels[b]
+                        # count unique nonzero instance IDs
+                        num_instances = (torch.unique(lbl) != 0).sum().item()
+                        batch_instance_count += num_instances
+
+                    self.ROI_counter += batch_instance_count
             #plot_image(images[0].cpu().numpy())
             #plot_image(labels[0].cpu().numpy())
             
@@ -763,8 +814,9 @@ class Trainer(BaseTrainer):
                         labels, use_gpu=True, device=self.device
                     )
 
-                    # compare_flows(labels_onehot_flows, flows.to(self.device))
+                    #compare_flows(labels_onehot_flows, flows.to(self.device))
                     #plot_image(_sigmoid(outputs[0,0,:,:].cpu().detach().numpy()))
+                    
                     #show_QC_results(images[0,0].cpu().numpy(), _sigmoid(outputs[0,-2,:,:].cpu().detach().numpy()), labels[0,-1].cpu().numpy())
 
                     # Calculate loss
@@ -782,17 +834,11 @@ class Trainer(BaseTrainer):
                     self.loss_flow.append(loss_flow)
                     self.loss_cellprob.append(loss_prob)
 
-                    # if phase == "train":
-                    #     outputs_postprocessed, labels = self._post_process(outputs.detach(), center_masks, labels)
-                    #     for b in range(self.current_bsize):
-                    #         iou_score, f1_score = self._get_metrics(outputs_postprocessed[b], labels[b])
-                    #         print(f"  [Train QC]  F1: {f1_score:.3f}, IoU: {iou_score:.3f}")
-
-                    #         plotting_image = images[b, 0].cpu().numpy()
-                    #         plotting_pred = outputs[b]
-                    #         plotting_label = labels[b]
-                    #         plot_image(labels_onehot_flows[0,2])
-                            #show_QC_results(plotting_image, labels_onehot_flows[b,2].cpu().numpy(), plotting_label)
+                    if phase == "train":
+                        if qc_counter < 5:
+                            # outputs, labels = self._post_process(outputs.detach(), center_masks, labels.detach())
+                            # show_QC_results_overlay(images[0, 0].detach().cpu().numpy(), outputs[0], labels[0])
+                            qc_counter += 1
                         
                     #qc_counter += 1
                     # Calculate valid statistics
@@ -811,10 +857,10 @@ class Trainer(BaseTrainer):
                             self.f1_metric.append(f1_score)
                             self.iou_metric.append(iou_score)
 
-                        
-                        # if qc_counter < 5:
-                        #     show_QC_results(images[0, 0].cpu(), outputs[:,:], labels)
-                        #     qc_counter += 1
+        
+                        if qc_counter < 5:
+                            #show_QC_results_overlay(images[0, 0].cpu().numpy(), outputs[0], labels[0])
+                            qc_counter += 1
 
                 # Backward pass
                 if phase == "train":
@@ -830,7 +876,7 @@ class Trainer(BaseTrainer):
                         self.optimizer.step()
 
                     ## Save model if certain ROI reached.
-                    if self.ROI_counter >= self.next_ROI_checkpoint and self.next_ROI_checkpoint is not None:
+                    if self.next_ROI_checkpoint is not None and self.ROI_counter >= self.next_ROI_checkpoint:
                         save_path = os.path.join(self.save_dir, f"{self.model_name}_ROI_{self.ROI_counter}_epoch{len(self.loss_history['epoch'])}.pth")
                         torch.save(self.model.state_dict(), save_path)
                         print(f"  Saved intermediate model at ROI {self.ROI_counter} to {save_path}")
@@ -969,7 +1015,7 @@ class Trainer(BaseTrainer):
             for b in range(self.current_bsize):
                 outputs_b = outputs[b]
                 gradflows, cellprob = outputs_b[:2], self._sigmoid(outputs_b[-1])
-                outputs_b = compute_masks(gradflows, cellprob, use_gpu=True, device=self.device)
+                outputs_b = compute_masks(gradflows, cellprob,cellprob_threshold=0.1, use_gpu=True, device=self.device)
                 outputs_b = outputs_b[0]  # (1, C, H, W) -> (C, H, W)
                 outputs_batch.append(outputs_b)
                 # if(cellcenters is not None):
@@ -977,7 +1023,7 @@ class Trainer(BaseTrainer):
             outputs = np.stack(outputs_batch, axis=0)  # (B, C, H, W)
         elif(outputs.ndim ==3):
             gradflows, cellprob = outputs[:2], self._sigmoid(outputs[-1])
-            outputs = compute_masks(gradflows, cellprob, use_gpu=True, device=self.device)
+            outputs = compute_masks(gradflows, cellprob, cellprob_threshold=0.1, use_gpu=True, device=self.device)
             outputs = outputs[0]  # (1, C, H, W) -> (C, H, W)
         else:
             raise ValueError("Outputs has wrong number of dimensions: should be 3 or 4.")

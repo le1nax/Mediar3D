@@ -3255,6 +3255,150 @@
     {
       "img": "/work/scratch/geiger/Datasets/Blasto/train/F1_095/images/cropped_image_Z_00045.tiff",
       "label": "/work/scratch/geiger/Datasets/Blasto/train/F1_095/masks/cropped_image_Z_00045_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0000.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0000_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0001.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0001_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0002.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0002_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0003.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0003_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0004.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0004_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0005.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0005_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0006.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0006_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0007.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0007_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0008.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0008_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0009.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0009_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0010.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0010_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0011.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0011_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0012.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0012_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0013.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0013_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0014.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0014_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0015.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0015_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0016.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0016_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0017.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0017_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0018.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0018_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0019.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0019_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0020.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0020_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0021.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0021_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0022.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0022_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0023.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0023_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0024.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0024_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0025.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0025_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0026.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0026_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0027.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0027_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0028.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0028_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0029.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0029_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0030.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0030_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0031.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0031_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0032.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0032_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0033.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0033_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0034.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0034_label.tiff"
+    },
+    {
+      "img": "/work/scratch/geiger/Datasets/Blasto/train_background/img/slice_0035.tiff",
+      "label": "/work/scratch/geiger/Datasets/Blasto/train_background/masks/slice_0035_label.tiff"
     }
   ]
 }

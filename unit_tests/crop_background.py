@@ -18,7 +18,8 @@ def crop_and_save_slices(input_path, img_out_dir, mask_out_dir, thresh_x, thresh
 
     # Crop subvolume
     #cropped = img[:thresh_z+1, :thresh_y+1, :thresh_x+1]  # [Z, newY, newX]
-    cropped = img[:20, :, :]  # [Z, newY, newX]
+    cropped = img[65:]  # [Z, newY, newX]
+    
     print(f"Cropped subvolume shape: {cropped.shape}")
 
     # Create output directories
@@ -40,9 +41,9 @@ def crop_and_save_slices(input_path, img_out_dir, mask_out_dir, thresh_x, thresh
 
 
 if __name__ == "__main__":
-    input_path = "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-DRO/01_background.tiff"
-    img_out_dir = "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-DRO/01_test_images_background"
-    mask_out_dir = "/work/scratch/geiger/Datasets/CTC/Fluo-N3DL-DRO/01_test_labels_background"
+    input_path = "/netshares/BiomedicalImageAnalysis/Resources/dataset_collection/BlastoSPIM1_train/F1_095/cropped/img/cropped_image.tif"
+    img_out_dir = "/work/scratch/geiger/Datasets/Blasto/train_background/img"
+    mask_out_dir = "/work/scratch/geiger/Datasets/Blasto/train_background/masks"
 
     thresh_x = 88
     thresh_y = 88

@@ -1,0 +1,22 @@
+{
+    "pred_setups":{
+        "name": "mediar",
+        "input_path": "/work/scratch/geiger/Datasets/CTC/sim3d/01_final_test_SG",
+        "ground_truth_path": "/work/scratch/geiger/Datasets/CTC/sim3d/01_final_test_GT_SG",
+        "output_path": "/work/scratch/geiger/Datasets/CTC/sim3d/01_final_test_res_SG/condor",
+        "make_submission": false,
+        "model_path": "/work/scratch/geiger/W_B/MEDIAR_PT/pretrained_mediar_00val_3gpus_5bs_2025-10-05_05-53-09_unwrapped.pth",
+        "device": "cuda:0",
+        "model":{
+            "name": "mediar-former",
+            "params": {}
+        },
+        "exp_name": "mediar_p1_base",
+        "algo_params": {"use_tta": false,
+                         "do_3D": true,     
+                         "cellprob_thresholds": [0.0001, 0.001, 0.01, 0.1, 0.3, 0.6],
+                         "plot_prob": false}
+    }
+}
+
+ 

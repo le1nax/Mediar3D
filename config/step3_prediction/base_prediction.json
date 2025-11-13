@@ -1,11 +1,11 @@
 {
     "pred_setups":{
         "name": "mediar",
-        "input_path": "../../Datasets/Blasto/Blast_035/cropped/img",
+        "input_path": "/work/scratch/geiger/Datasets/testing/img",
         "cellcenters_path": "",
-        "output_path": "../../Datasets/Blasto/Blast_035/cropped/res_mediar_condor_pretrained_50ep",
+        "output_path": "/work/scratch/geiger/Datasets/testing/results_mediar_test_final",
         "make_submission": false,
-        "model_path": "../../W_B/MEDIAR_FT/condor00_blast95_50ep_2025-10-07_22-34-45.pth",
+        "model_path": "/work/scratch/geiger/W_B/MEDIAR_PT/pretrained_mediarcondor_00val_4gpus_5bs_newdistribution_2025-10-17_21-55-32.pth",
         "device": "cuda:0",
         "model":{
             "name": "mediar-former",

@@ -2,7 +2,7 @@ import os
 import glob
 
 # Set your directory path
-folder_path = "../Datasets/CTC/sim3d/02_test"
+folder_path = "/work/scratch/geiger/Datasets/CTC/sim3d/02_final_test"
 
 # Get all files in the folder (adjust the pattern if necessary)
 files = sorted(glob.glob(os.path.join(folder_path, "*")), key=lambda x: os.path.basename(x))
@@ -16,7 +16,7 @@ for idx, file in enumerate(files, start=1):
     os.rename(file, new_filepath)
 
 # Set your directory path
-folder_path = "../Datasets/CTC/sim3d/02_test_GT"
+folder_path = "/work/scratch/geiger/Datasets/CTC/sim3d/02_final_test_GT"
 
 # Get all files in the folder (adjust the pattern if necessary)
 files = sorted(glob.glob(os.path.join(folder_path, "*")), key=lambda x: os.path.basename(x))

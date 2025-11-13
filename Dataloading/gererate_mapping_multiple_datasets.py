@@ -58,6 +58,7 @@ if __name__ == "__main__":
         nargs="+",
         default=[
             "/work/scratch/geiger/Datasets/Blasto/train/F1_095/images",
+            "/work/scratch/geiger/Datasets/Blasto/train_background/img"
         ],
         help="List of image directories"
     )
@@ -67,7 +68,8 @@ if __name__ == "__main__":
         "--train_label_paths",
         nargs="+",
         default=[
-            "/work/scratch/geiger/Datasets/Blasto/train/F1_095/masks"
+            "/work/scratch/geiger/Datasets/Blasto/train/F1_095/masks",
+            "/work/scratch/geiger/Datasets/Blasto/train_background/masks"
         ],
         help="List of label directories"
     )
@@ -95,3 +97,17 @@ if __name__ == "__main__":
 
     map_labeled = {"official": all_data_dicts}
     add_mapping_to_json(os.path.join(MAP_DIR, f"mapping_labeled_{args.data}.json"), map_labeled)
+
+    # --- After creating all_data_dicts ---
+    dataset_names = set()
+    for item in all_data_dicts:
+        # take the parent folder name of the image path
+        dataset_name = os.path.basename(os.path.dirname(item["img"]))
+        dataset_names.add(dataset_name)
+
+    dataset_names = sorted(list(dataset_names))
+
+    print("\nDetected datasets from mapping file:")
+    for name in dataset_names:
+        print(f"  '{name}': <YOUR_RATIO>,")
+    print("\n# Copy-paste the above into your custom_ratios dict and fill in probabilities.\n")

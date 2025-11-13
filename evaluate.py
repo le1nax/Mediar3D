@@ -6,7 +6,7 @@ from collections import OrderedDict
 from tqdm import tqdm
 
 from train_tools.utils import ConfLoader, pprint_config
-from train_tools.measures import evaluate_metrics_cellseg
+from train_tools.measures import evaluate_metrics_cellseg, compute_CTC_SEG_fast, compute_AP_fast, average_precision_final
 
 import os
 import numpy as np
@@ -22,20 +22,24 @@ import pandas as pd
 def main(args):
     
     only_pred_overlay = args.eval_setups.only_pred_overlay if 'only_pred_overlay' in args.eval_setups else False
+    TRIF = args.eval_setups.TRIF if 'TRIF' in args.eval_setups else False
 
     pred_path, img_path = args.eval_setups.pred_path, args.eval_setups.img_path
 
 
     # Get files from the paths
     if only_pred_overlay:
-        show_QC_results_visual_inspection(img_path, pred_path)
+        if(TRIF):
+            show_QC_results_visual_inspection_sameaxis(img_path, pred_path)
+        else:
+            show_QC_results_visual_inspection_first(img_path, pred_path)
         return
 
     gt_path = args.eval_setups.gt_path
     names = sorted(os.listdir(pred_path))
 
     names_total = []
-    ious_total, precisions_total, recalls_total, f1_scores_total = [], [], [], []
+    ious_total, precisions_total, recalls_total, f1_scores_total, seg_total = [], [], [], [], []
 
     for name in tqdm(names):
         assert name.endswith("_label.tiff"), "The suffix of label name should be _label.tiff"
@@ -48,12 +52,16 @@ def main(args):
 
         # Evaluate metrics
         iou, precision, recall, f1_score = evaluate_metrics_cellseg(pred, gt, threshold=0.5)
+        SEG_metric, _ = compute_CTC_SEG_fast(gt, pred)
+        AP = average_precision_final(gt, pred)
 
         names_total.append(name)
         ious_total.append(np.round(iou, 4))
         precisions_total.append(np.round(precision, 4))
         recalls_total.append(np.round(recall, 4))
         f1_scores_total.append(np.round(f1_score, 4))
+        seg_total.append(np.round(SEG_metric, 8))
+
 
     # Compile results into DataFrame
     cellseg_metric = OrderedDict()
@@ -62,12 +70,15 @@ def main(args):
     cellseg_metric["Precision"] = precisions_total
     cellseg_metric["Recall"] = recalls_total
     cellseg_metric["F1_Score"] = f1_scores_total
+    cellseg_metric["SEG_Score"] = seg_total
 
     cellseg_metric = pd.DataFrame(cellseg_metric)
 
     # Show results
     print("mean IoU:", np.mean(cellseg_metric["IoU"]))
     print("mean F1 Score:", np.mean(cellseg_metric["F1_Score"]))
+    print("SEG_Metric:", np.mean(cellseg_metric["SEG_Score"]))
+    print(f'>>> average precision at iou threshold 0.5 = {AP}')
         
 
     show_QC_results(img_path, pred_path, gt_path, cellseg_metric)
@@ -187,7 +198,7 @@ def show_QC_results(img_path, pred_path, gt_path, cellseg_metric):
     ax_image_textbox = plt.axes([0.4, 0.1, 0.15, 0.05])
     text_box_image = TextBox(ax_image_textbox, "Image Index:", initial="0")
     text_box_image.on_submit(lambda text: on_text_submit(text))
-
+    
     plt.show()
 
 
@@ -286,6 +297,190 @@ def show_QC_results_visual_inspection(img_path, pred_path):
             print("Please enter a valid integer.")
 
     text_box_image.on_submit(lambda text: on_text_submit(text))
+
+    plt.show()
+
+
+def show_QC_results_visual_inspection_first(img_path, pred_path):
+    print("Now plotting the first image-prediction pair...")
+
+    # --- Get file lists ---
+    source_files = sorted([f for f in os.listdir(img_path) if f.endswith(('.tiff', '.tif'))])
+    prediction_files = sorted([f for f in os.listdir(pred_path) if f.endswith(('.tiff', '.tif'))])
+
+    if not source_files or not prediction_files:
+        raise FileNotFoundError("No TIFF images found in one or both directories.")
+
+    # --- Use only the first pair ---
+    src_file = source_files[0]
+    pred_file = prediction_files[0]
+
+    src_image = io.imread(os.path.join(img_path, src_file))
+    pred_image = io.imread(os.path.join(pred_path, pred_file))
+
+    if src_image.shape != pred_image.shape:
+        raise ValueError(f"Shape mismatch:\n - {src_file}: {src_image.shape}\n - {pred_file}: {pred_image.shape}")
+
+    print(f"Displaying: {src_file} and {pred_file}")
+
+    Image_Z = src_image.shape[0]
+    middle_slice = Image_Z // 2
+
+    # --- Normalize image contrast ---
+    norm = mcolors.Normalize(
+        vmin=np.percentile(src_image[middle_slice], 1),
+        vmax=np.percentile(src_image[middle_slice], 99)
+    )
+
+    # --- Randomized label colormap ---
+    unique_labels = np.unique(pred_image)
+    n_labels = len(unique_labels)
+
+    has_bg = 0 in unique_labels
+    labels_no_bg = unique_labels[unique_labels != 0]
+
+    shuffled_labels = np.random.permutation(labels_no_bg)
+
+    base_cmap = plt.get_cmap('nipy_spectral', n_labels)
+    shuffled_colors = base_cmap(np.linspace(0, 1, n_labels))
+    np.random.shuffle(shuffled_colors)
+
+    cmap_array = np.zeros((n_labels, 4))
+    cmap_array[:, :] = shuffled_colors
+    if has_bg:
+        cmap_array[unique_labels == 0] = [0, 0, 0, 0]  # transparent background
+    cmap_labels = mcolors.ListedColormap(cmap_array)
+    norm_labels = mcolors.BoundaryNorm(boundaries=np.arange(n_labels + 1) - 0.5, ncolors=n_labels)
+
+    label_to_index = {label: idx for idx, label in enumerate(shuffled_labels, start=int(has_bg))}
+    if has_bg:
+        label_to_index[0] = 0
+    pred_indexed = np.vectorize(label_to_index.get)(pred_image)
+
+    # --- Initial state ---
+    slice_idx = middle_slice
+    state = {'slice_idx': slice_idx}
+
+    # --- Plot setup (vertical layout, big images) ---
+    fig, axes = plt.subplots(2, 1, figsize=(12, 20))  # make tall figure
+    plt.subplots_adjust(left=0.05, right=0.95, top=0.98, bottom=0.08, hspace=0.05)
+
+    # Input image (top)
+    im_input = axes[0].imshow(src_image[slice_idx], norm=norm, cmap='magma', interpolation='nearest')
+    axes[0].set_title(f'Source (Z={slice_idx})', fontsize=16)
+    axes[0].axis("off")
+
+    # Overlay (bottom)
+    im_overlay_input = axes[1].imshow(src_image[slice_idx], norm=norm, cmap='magma', interpolation='nearest')
+    im_overlay_pred = axes[1].imshow(
+    pred_indexed[slice_idx],
+    cmap=cmap_labels,
+    norm=norm_labels,
+    alpha=0.5,
+    interpolation='nearest'
+)
+    axes[1].set_title("Overlay: Input + Shuffled Segmentation Labels", fontsize=16)
+    axes[1].axis("off")
+
+    # --- Slice slider ---
+    ax_slider = plt.axes([0.25, 0.03, 0.5, 0.02])
+    slider = Slider(ax_slider, "Slice", 0, Image_Z - 1, valinit=slice_idx, valstep=1)
+
+    def update(val):
+        slice_idx = int(slider.val)
+        state['slice_idx'] = slice_idx
+        im_input.set_data(src_image[slice_idx])
+        im_overlay_input.set_data(src_image[slice_idx])
+        im_overlay_pred.set_data(pred_indexed[slice_idx])
+        axes[0].set_title(f'Source (Z={slice_idx})', fontsize=16)
+        fig.canvas.draw_idle()
+
+    slider.on_changed(update)
+
+    plt.show()
+
+
+def show_QC_results_visual_inspection_sameaxis(img_path, pred_path):
+    print("Now plotting the first image-prediction pair...")
+
+    # --- Get file lists ---
+    source_files = sorted([f for f in os.listdir(img_path) if f.endswith(('.tiff', '.tif'))])
+    prediction_files = sorted([f for f in os.listdir(pred_path) if f.endswith(('.tiff', '.tif'))])
+
+    if not source_files or not prediction_files:
+        raise FileNotFoundError("No TIFF images found in one or both directories.")
+
+    # --- Use only the first pair ---
+    src_file = source_files[0]
+    pred_file = prediction_files[0]
+
+    src_image = io.imread(os.path.join(img_path, src_file))
+    pred_image = io.imread(os.path.join(pred_path, pred_file))
+
+    if src_image.shape != pred_image.shape:
+        raise ValueError(f"Shape mismatch:\n - {src_file}: {src_image.shape}\n - {pred_file}: {pred_image.shape}")
+
+    print(f"Displaying: {src_file} and {pred_file}")
+
+    Image_Z = src_image.shape[0]
+    middle_slice = Image_Z // 2
+
+    # --- Normalize image contrast ---
+    norm = mcolors.Normalize(
+        vmin=np.percentile(src_image[middle_slice], 1),
+        vmax=np.percentile(src_image[middle_slice], 99)
+    )
+
+    # --- Randomized label colormap ---
+    unique_labels = np.unique(pred_image)
+    has_bg = 0 in unique_labels
+    labels_no_bg = unique_labels[unique_labels != 0]
+
+    # Shuffle label IDs for non-adjacent colors
+    shuffled_labels = np.random.permutation(labels_no_bg)
+
+    base_cmap = plt.get_cmap('nipy_spectral', len(shuffled_labels))
+    shuffled_colors = base_cmap(np.linspace(0, 1, len(shuffled_labels)))
+    np.random.shuffle(shuffled_colors)
+
+    cmap_array = np.zeros((len(shuffled_labels) + int(has_bg), 4))
+    cmap_array[int(has_bg):, :] = shuffled_colors
+    if has_bg:
+        cmap_array[0] = [0, 0, 0, 0]  # transparent background
+    cmap_labels = mcolors.ListedColormap(cmap_array)
+    norm_labels = mcolors.BoundaryNorm(
+        boundaries=np.arange(len(shuffled_labels) + int(has_bg) + 1) - 0.5,
+        ncolors=len(shuffled_labels) + int(has_bg)
+    )
+
+    # Map original labels → shuffled colormap indices
+    label_to_index = {label: idx + int(has_bg) for idx, label in enumerate(shuffled_labels)}
+    if has_bg:
+        label_to_index[0] = 0
+    pred_indexed = np.vectorize(label_to_index.get)(pred_image)
+
+    # --- Plot setup (overlay on same axis) ---
+    fig, ax = plt.subplots(figsize=(12, 12))
+    plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.08)
+
+    slice_idx = middle_slice
+    im_input = ax.imshow(src_image[slice_idx], norm=norm, cmap='magma', interpolation='nearest')
+    im_pred = ax.imshow(pred_indexed[slice_idx], cmap=cmap_labels, norm=norm_labels, alpha=0.5, interpolation='none')
+    ax.set_title(f"Overlay (Z={slice_idx})", fontsize=16)
+    ax.axis("off")
+
+    # --- Slice slider ---
+    ax_slider = plt.axes([0.25, 0.03, 0.5, 0.02])
+    slider = Slider(ax_slider, "Slice", 0, Image_Z - 1, valinit=slice_idx, valstep=1)
+
+    def update(val):
+        z = int(slider.val)
+        im_input.set_data(src_image[z])
+        im_pred.set_data(pred_indexed[z])
+        ax.set_title(f"Overlay (Z={z})", fontsize=16)
+        fig.canvas.draw_idle()
+
+    slider.on_changed(update)
 
     plt.show()
 
