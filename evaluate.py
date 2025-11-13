@@ -6,7 +6,7 @@ from collections import OrderedDict
 from tqdm import tqdm
 
 from train_tools.utils import ConfLoader, pprint_config
-from train_tools.measures import evaluate_metrics_cellseg, compute_CTC_SEG_fast, compute_AP_fast, average_precision_final
+from train_tools.measures import evaluate_metrics_cellseg, compute_CTC_SEG_fast, average_precision_final
 
 import os
 import numpy as np

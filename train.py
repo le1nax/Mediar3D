@@ -5,6 +5,7 @@ import argparse, pprint
 from datetime import datetime
 
 import os
+##comment this line out if you want to log with wandb
 os.environ["WANDB_MODE"] = "disabled"
 
 
@@ -116,19 +117,7 @@ def main(args):
     except Exception as e:
         print(f"Unexpected error while saving model: {e}")
 
-    # # Conduct prediction using the trained model
-    # predictor = PREDICTOR[args.train_setups.trainer.name](
-    #     trainer.model,
-    #     args.train_setups.trainer.params.device,
-    #     args.pred_setups.input_path,
-    #     args.pred_setups.output_path,
-    #     args.pred_setups.make_submission,
-    #     args.pred_setups.exp_name,
-    #     args.pred_setups.algo_params,
-    # )
 
-    # total_time = predictor.conduct_prediction()
-    # wandb.log({"total_time": total_time})
 
 
 # Parser arguments for terminal execution

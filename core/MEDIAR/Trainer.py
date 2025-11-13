@@ -39,183 +39,6 @@ def pad_to_multiple(tensor, multiple=32):
 
     return nn.functional.pad(tensor, (pad_left, pad_right, pad_top, pad_bottom), mode="constant", value=0)
 
-def plot_image(image, title='Image', slice_idx=None, cmap='hsv'):
-    """
-    Plot a 2D image or a slice from a 3D image.
-
-    Parameters:
-        image (np.ndarray): Image data (2D or 3D).
-        title (str): Plot title.
-        slice_idx (int): Index of the slice to show if image is 3D. If None, shows middle slice.
-        cmap (str): Colormap to use.
-    """
-    if image.ndim == 2:
-        plt.imshow(image, cmap=cmap)
-        plt.title(title)
-        plt.axis('off')
-        plt.show()
-
-    elif image.ndim == 3:
-        if slice_idx is None:
-            slice_idx = image.shape[0] // 2
-        plt.imshow(image[slice_idx], cmap=cmap)
-        plt.title(f"{title} (slice {slice_idx})")
-        plt.axis('off')
-        plt.show()
-
-    else:
-        raise ValueError("Image must be 2D or 3D numpy array.")
-    
-
-def plot_cellpose_flow(flow, title='Flow'):
-    """
-    Plot a 2D flow field with Cellpose-style coloring (hue = angle, value = magnitude).
-
-    Parameters:
-        flow (np.ndarray): Flow array of shape (2, H, W), where flow[0] = dx, flow[1] = dy.
-        title (str): Plot title.
-    """
-    if flow.ndim != 3 or flow.shape[0] != 2:
-        raise ValueError("Flow must have shape (2, H, W)")
-
-    dx, dy = flow[0], flow[1]
-    mag = np.sqrt(dx**2 + dy**2)
-    ang = np.arctan2(dy, dx)  # angle in radians
-
-    # Normalize magnitude
-    mag = mag / (np.max(mag) + 1e-8)
-
-    # Map angle [-pi, pi] → [0, 1] for hue
-    hue = (ang + np.pi) / (2 * np.pi)
-
-    # HSV image (hue, saturation, value)
-    hsv = np.zeros((flow.shape[1], flow.shape[2], 3), dtype=np.float32)
-    hsv[..., 0] = hue
-    hsv[..., 1] = 1.0
-    hsv[..., 2] = mag
-
-    # Convert HSV → RGB for display
-    rgb = plt.cm.hsv(hsv[..., 0])[:, :, :3] * hsv[..., 2][..., None]
-
-    plt.imshow(rgb)
-    plt.title(title)
-    plt.axis('off')
-    plt.show()
-    
-
-def plot_overlay_image(image1, image2, title='Overlay Image', slice_idx=None, alpha=0.5):
-    """
-    Plot a 2D image with a blue-transparent overlay from another image.
-    
-    Parameters:
-        image1 (np.ndarray): Base image (2D or 3D), shown in 'magma'.
-        image2 (np.ndarray): Overlay image (same shape), shown in blue with transparency.
-        title (str): Plot title.
-        slice_idx (int): Index of the slice to show if 3D. If None, uses middle slice.
-        alpha (float): Opacity of the overlay image (0 to 1).
-    """
-    # Handle 3D inputs
-    if image1.ndim == 3:
-        if slice_idx is None:
-            slice_idx = image1.shape[0] // 2
-        image1 = image1[slice_idx]
-        image2 = image2[slice_idx]
-
-    if image1.shape != image2.shape:
-        raise ValueError("image1 and image2 must have the same shape.")
-
-    plt.figure(figsize=(6, 6))
-    plt.imshow(image1, cmap='Blues')
-    plt.imshow(image2, cmap='magma', alpha=alpha)
-    plt.title(title)
-    plt.axis('off')
-    plt.tight_layout()
-    plt.show()
-    
-def show_QC_results(src_image, pred_image, gt_image):
-    """
-    Show quality control results for a single 2D slice.
-    """
-
-    # Handle normalization robustly: ignore padded zeros
-    nonzero_vals = src_image[src_image > 0]
-    if nonzero_vals.size > 0:
-        vmin = np.percentile(nonzero_vals, 1)
-        vmax = np.percentile(nonzero_vals, 99)
-    else:
-        vmin, vmax = 0, 1  # fallback in case image is entirely zero
-
-    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
-    mask_norm = mcolors.Normalize(vmin=0, vmax=1)
-
-    # Set up figure and axes
-    fig, axes = plt.subplots(4, 1, figsize=(10, 20))
-
-    # 1. Source image
-    axes[0].imshow(src_image, norm=norm, cmap='magma', interpolation='nearest')
-    axes[0].set_title('Source Image')
-
-    # 2. Overlay: Source + Prediction
-    axes[1].imshow(src_image, norm=norm, cmap='magma', interpolation='nearest')
-    axes[1].imshow(pred_image, norm=mask_norm, alpha=0.5, cmap='Blues')
-    axes[1].set_title('Overlay: Source + Prediction')
-
-    # 3. Prediction only
-    axes[2].imshow(pred_image, cmap='Blues', norm=mask_norm, interpolation='nearest')
-    axes[2].set_title('Prediction')
-
-    # 4. Ground Truth
-    axes[3].imshow(gt_image, interpolation='nearest', norm=mask_norm, cmap='Greens')
-    axes[3].set_title('Ground Truth')
-
-    for ax in axes:
-        ax.axis("off")
-
-    plt.tight_layout()
-    plt.show()
-
-def show_QC_results_overlay(src_image, pred_image, gt_image, save_path=None):
-    """
-    Show quality control results for a single 2D slice.
-
-    Displays:
-    1. Overlay: Source + Prediction
-    2. Overlay: Prediction + Ground Truth
-    """
-
-    # Robust normalization for the source image (ignore zeros)
-    nonzero_vals = src_image[src_image > 0]
-    if nonzero_vals.size > 0:
-        vmin = np.percentile(nonzero_vals, 1)
-        vmax = np.percentile(nonzero_vals, 99)
-    else:
-        vmin, vmax = 0, 1
-
-    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
-    mask_norm = mcolors.Normalize(vmin=0, vmax=1)
-
-    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-
-    # 1️⃣ Source + Prediction
-    axes[0].imshow(src_image, norm=norm, cmap='gray', interpolation='nearest')
-    axes[0].imshow(pred_image, norm=mask_norm, alpha=0.5, cmap='Blues')
-    axes[0].set_title('Overlay: Source + Prediction')
-    axes[0].axis('off')
-
-    # 2️⃣ Prediction + Ground Truth
-    axes[1].imshow(pred_image, norm=mask_norm, alpha=0.6, cmap='Blues')
-    axes[1].imshow(gt_image, norm=mask_norm, alpha=0.4, cmap='Greens')
-    axes[1].set_title('Overlay: Prediction + Ground Truth')
-    axes[1].axis('off')
-
-    plt.tight_layout()
-
-    if save_path is not None:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"Saved QC overlay to: {save_path}")
-    
-    plt.show()
 
 def remove_zero_padding_2d(tensor: torch.Tensor, threshold: float = 1e-6):
     """
@@ -250,76 +73,6 @@ def remove_zero_padding_2d(tensor: torch.Tensor, threshold: float = 1e-6):
     cropped = arr[slices]
 
     return torch.from_numpy(cropped).to(tensor.device), slices
-
-def compare_flows(flow_pred, flow_loaded, atol=1e-5, rtol=1e-3):
-    """
-    Compares two flow tensors or arrays. Assumes both are [B, C, H, W].
-    Automatically converts numpy arrays to tensors and moves them to the same device.
-    """
-    if isinstance(flow_pred, np.ndarray):
-        flow_pred = torch.from_numpy(flow_pred)
-
-    if isinstance(flow_loaded, np.ndarray):
-        flow_loaded = torch.from_numpy(flow_loaded)
-
-    # Ensure same device
-    flow_pred = flow_pred.to(flow_loaded.device)
-
-    if flow_pred.shape != flow_loaded.shape:
-        print(f"Shape mismatch: predicted {flow_pred.shape}, loaded {flow_loaded.shape}")
-        return False
-
-    equal = torch.allclose(flow_pred, flow_loaded, atol=atol, rtol=rtol)
-
-    if not equal:
-        diff = (flow_pred - flow_loaded).abs()
-        print(f"Flow mismatch! Max diff: {diff.max().item():.6f}, Mean diff: {diff.mean().item():.6f}")
-    else:
-        print("Flows match.")
-    
-    return equal
-
-def plot_imageSlider(image, cmap='gray', title=''):
-    
-
-    # Set up figure and axes
-    fig, ax = plt.subplots(figsize=(6, 6))
-    plt.subplots_adjust(bottom=0.25)  # Leave space for slider
-
-    # Display image with log scale
-    im = ax.imshow(image, cmap='magma', norm=LogNorm(vmin=1e-4, vmax=1))
-    fig.colorbar(im, ax=ax, label='Cell Probability')
-    ax.set_title('Interactive Thresholding')
-    ax.axis('off')
-
-    # Add a slider axis below the plot
-    ax_slider = plt.axes([0.2, 0.1, 0.65, 0.03])  # [left, bottom, width, height]
-    threshold_slider = Slider(
-        ax=ax_slider,
-        label='Threshold',
-        valmin=1e-4,
-        valmax=1,
-        valinit=1e-4,
-        valstep=1e-4
-    )
-
-    # Update function for the slider
-    def update(val):
-        threshold = threshold_slider.val
-        masked_image = np.copy(image)
-        masked_image[masked_image < threshold] = 0
-        im.set_data(masked_image)
-        fig.canvas.draw_idle()
-
-    # Connect slider to update function
-    threshold_slider.on_changed(update)
-
-    # Show the window
-    plt.show()
-        
-
-def _sigmoid(z):
-    return 1 / (1 + np.exp(-z))
 
 
 
@@ -608,9 +361,7 @@ class Trainer(BaseTrainer):
 
             # case 1: empty label -> remove zero padding using image crop
             if nonzero.shape[0] == 0:
-                #plot_image(images[b].cpu().numpy(), title=f"Cropped image {b} before removing zero padding")
                 cropped_img, slices = remove_zero_padding_2d(images[b])
-                #plot_image(cropped_img.cpu().numpy(), title=f"Cropped image {b} after removing zero padding")
                 cropped_images.append(cropped_img)
 
                 if slices is not None:
@@ -627,21 +378,7 @@ class Trainer(BaseTrainer):
                     if flows is not None:
                         cropped_flows.append(flows[b])
 
-                #print(cropped_img.shape)
-                #if(cropped_img.shape[1] >1900 or cropped_img.shape[2]>1900):
-                #    print(f"Warning: image {b} still very large after removing zero padding: {cropped_img.shape}")
-
                 continue
-
-            # # case 2: non-empty, maybe keep full image
-            # if random.random() < full_prob:
-            #     cropped_images.append(images[b])
-            #     cropped_labels.append(labels[b])
-            #     if center_masks is not None:
-            #         cropped_center_masks.append(center_masks[b])
-            #     if flows is not None:
-            #         cropped_flows.append(flows[b])
-            #     continue
 
             # case 3: ROI crop
             y_min, y_max = nonzero[:, 0].min().item(), nonzero[:, 0].max().item()
@@ -656,10 +393,7 @@ class Trainer(BaseTrainer):
             x_start = max(x_min - buffer, 0)
             x_end   = min(x_max + buffer, W)
 
-            #if( y_end - y_start >1900 or x_end - x_start>1900):
-             #   print(f"Warning: image {b} still very large after ROI crop: {y_end - y_start} x {x_end - x_start}")
-            #plot_image(images[b, :, y_start:y_end, x_start:x_end].cpu().numpy())
-            #print(images[b, :, y_start:y_end, x_start:x_end].shape)
+
             cropped_images.append(images[b, :, y_start:y_end, x_start:x_end])
             cropped_labels.append(labels[b, :, y_start:y_end, x_start:x_end])
             if center_masks is not None:
@@ -777,8 +511,7 @@ class Trainer(BaseTrainer):
                 images = torch.cat([images, images_pub], dim=0)
                 labels = torch.cat([labels, labels_pub], dim=0)
 
-            #plot_image(images[0].cpu().numpy())
-            #plot_image(labels[0].cpu().numpy())
+
             if self.incomplete_annotations:
                 flip = random.choice([True, False])
 
@@ -798,59 +531,34 @@ class Trainer(BaseTrainer):
                         batch_instance_count += num_instances
 
                     self.ROI_counter += batch_instance_count
-            #plot_image(images[0].cpu().numpy())
-            #plot_image(labels[0].cpu().numpy())
+
             
             self.optimizer.zero_grad()
             # Forward pass
             with torch.cuda.amp.autocast(enabled=self.amp):
                 with torch.set_grad_enabled(phase == "train"):
-                    # Output shape is B x [grad y, grad x, cellprob] x H x W
                     outputs = self._inference(images, phase)
-                    #plot_image(outputs[0, 0].cpu().detach().numpy())
 
                     # Map label masks to graidnet and onehot
                     labels_onehot_flows = labels_to_flows(
                         labels, use_gpu=True, device=self.device
                     )
 
-                    #compare_flows(labels_onehot_flows, flows.to(self.device))
-                    #plot_image(_sigmoid(outputs[0,0,:,:].cpu().detach().numpy()))
-                    
-                    #show_QC_results(images[0,0].cpu().numpy(), _sigmoid(outputs[0,-2,:,:].cpu().detach().numpy()), labels[0,-1].cpu().numpy())
-
                     # Calculate loss
                     if self.incomplete_annotations:
                         loss_prob, loss_flow = self.mediar_criterion_incomplete_annotations(outputs, labels_onehot_flows, dilation_iters=10)
                     else:
                         loss_prob, loss_flow = self.mediar_criterion(outputs, labels_onehot_flows)
-                    # show_QC_results(
-                    #                 images[0,0].detach().cpu().numpy(),
-                    #                 supervision_mask[0].detach().cpu().numpy(),   # prediction (cell prob)
-                    #                 labels[0, 0].detach().cpu().numpy()                  # ground truth
-                    #             )
+
 
                     loss = loss_prob + loss_flow
                     self.loss_flow.append(loss_flow)
                     self.loss_cellprob.append(loss_prob)
 
-                    if phase == "train":
-                        if qc_counter < 5:
-                            # outputs, labels = self._post_process(outputs.detach(), center_masks, labels.detach())
-                            # show_QC_results_overlay(images[0, 0].detach().cpu().numpy(), outputs[0], labels[0])
-                            qc_counter += 1
-                        
-                    #qc_counter += 1
+
                     # Calculate valid statistics
                     if phase != "train":
                         outputs, labels = self._post_process(outputs, center_masks, labels)
-
-                        # plot_image(outputs)
-                        # plot_image(labels)
-                        # plotting_image = images[0, 0].cpu().numpy()
-                        # plotting_pred = outputs[0]
-                        # plotting_label = labels[0]
-                        # show_QC_results(plotting_image, plotting_pred, plotting_label)
 
                         for b in range(self.current_bsize):
                             iou_score, f1_score = self._get_metrics(outputs[b], labels[b])
@@ -932,20 +640,6 @@ class Trainer(BaseTrainer):
 
     def _inference(self, images, phase="train"):
         """inference methods for different phase"""
-
-        #images_np = images.detach().cpu().numpy()  # (B, C, H, W)
-        # for i in range(images_np.shape[0]):
-        #     img = images_np[i]
-        #     if img.ndim == 3:
-        #         # If shape is (C, H, W), select first channel for grayscale
-        #         img = img[0]
-
-        #     plt.figure(figsize=(4, 4))
-        #     plt.imshow(img, cmap='gray')
-        #     plt.title(f"Input Image {i}")
-        #     plt.axis('off')
-        #     plt.tight_layout()
-        #     plt.show()
 
         # Run model inference
         if phase != "train":
