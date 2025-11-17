@@ -658,50 +658,7 @@ class Trainer(BaseTrainer):
         return outputs
 
 
-    def _plot_loss_metrics(self):
-        import numpy as np
-        import matplotlib.pyplot as plt
-
-        history = self.loss_history
-
-        # Extract lists
-        epochs = np.array(history["epoch"])
-        train_total = np.array(history["total_loss"], dtype=np.float32)
-        val_total = np.array(history["val_loss"], dtype=np.float32)
-        val_iou = np.array(history["val_iou"], dtype=np.float32)
-
-        # Get minimum length to align all lists
-        min_len = min(len(epochs), len(train_total), len(val_total), len(val_iou))
-
-        # Truncate to same length
-        epochs = epochs[:min_len]
-        train_total = train_total[:min_len]
-        val_total = val_total[:min_len]
-        val_iou = val_iou[:min_len]
-
-        # Remove NaNs
-        mask = ~np.isnan(train_total) & ~np.isnan(val_total) & ~np.isnan(val_iou)
-        epochs = epochs[mask]
-        train_total = train_total[mask]
-        val_total = val_total[mask]
-        val_iou = val_iou[mask]
-
-        # Plot
-        plt.figure(figsize=(10, 6))
-        plt.plot(epochs, train_total, label="Train Total Loss", color="orange", linewidth=2)
-        plt.plot(epochs, val_total, label="Val Total Loss", color="blue", linewidth=2)
-        plt.plot(epochs, val_iou, label="Val IOU", color="green", linestyle="--", linewidth=2)
-
-        plt.xlabel("Epoch")
-        plt.ylabel("Value")
-        plt.title("Train/Val Total Loss and IOU")
-        plt.legend(loc="best")
-        plt.grid(True)
-        plt.tight_layout()
-        plt.show()
-            
-
-    def _post_process(self, outputs, cellcenters=None,labels=None):
+    def _post_process(self, outputs,labels=None):
         """Predict cell instances using the gradient tracking"""
         outputs_batch = []
         outputs = outputs.cpu().numpy()  # (B, C, H, W)
